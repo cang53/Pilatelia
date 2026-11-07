@@ -45,6 +45,8 @@
             <label>Durée (min) <input type="number" name="duration_minutes" required value="50" min="10" max="240" /></label>
             <label>Places <input type="number" name="capacity" required value="8" min="1" max="100" /></label>
             <label class="span-2">Intitulé <input name="title" value="Pilates" maxlength="80" /></label>
+            <label class="span-2">Répéter chaque semaine jusqu’au <input type="date" name="until" aria-describedby="untilHint" />
+              <small class="muted" id="untilHint">Laisser vide pour une seule séance.</small></label>
           </div>
           <div class="actions">
             <button class="btn">Ajouter</button>

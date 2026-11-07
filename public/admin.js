@@ -36,6 +36,7 @@ async function loadWeek() {
   form.date.min = ymd(week) > today ? ymd(week) : today; // pas de créneau dans le passé
   form.date.max = ymd(addDays(week, 6));
   if (!form.date.value || form.date.value < form.date.min || form.date.value > form.date.max) form.date.value = form.date.min;
+  form.until.min = form.date.value;
   const slots = await adminApi(`/api/admin/slots?${weekQuery(week)}`);
   const days = byDay(slots);
   $('#week').innerHTML = Array.from({ length: 7 }, (_, i) => {
@@ -67,17 +68,23 @@ function slotCard(s) {
   </div>`;
 }
 
+$('#add').date.addEventListener('change', (e) => { e.target.form.until.min = e.target.value; });
+
 $('#add').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
+  const first = new Date(`${f.date.value}T${f.time.value}`);
+  const until = f.until.value ? new Date(`${f.until.value}T23:59`) : first;
+  const rows = [];
+  // addDays garde l'heure locale, même au changement d'heure. 52 semaines max.
+  for (let d = first; d <= until && rows.length < 52; d = addDays(d, 7)) {
+    rows.push({ starts_at: d.toISOString(), duration_minutes: Number(f.duration_minutes.value), capacity: Number(f.capacity.value), title: f.title.value });
+  }
+  if (!rows.length) return toast('La date de fin est avant le premier jour.');
   try {
-    await adminApi('/api/admin/slots', { method: 'POST', body: JSON.stringify([{
-      starts_at: new Date(`${f.date.value}T${f.time.value}`).toISOString(),
-      duration_minutes: Number(f.duration_minutes.value),
-      capacity: Number(f.capacity.value),
-      title: f.title.value,
-    }]) });
-    toast('Créneau ajouté');
+    await adminApi('/api/admin/slots', { method: 'POST', body: JSON.stringify(rows) });
+    toast(rows.length > 1 ? `${rows.length} séances ajoutées, jusqu’au ${fmt.date.format(new Date(rows.at(-1).starts_at))}` : 'Créneau ajouté');
+    f.until.value = '';
     loadWeek();
   } catch (err) { toast(err.message); }
 });

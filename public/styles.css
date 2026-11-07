@@ -73,7 +73,7 @@ button, input { font: inherit; color: inherit; }
 label { display: grid; gap: 6px; font-size: .95rem; font-weight: 500; }
 input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
 input:focus { border-color: var(--accent); outline: none; }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: start; }
 .span-2 { grid-column: span 2; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -111,3 +111,4 @@ dialog form, dialog > div { display: grid; gap: 14px; }
   .slot-head { flex-wrap: wrap; }
 }
 .past { opacity: .55; }
+label small { font-weight: 400; font-size: .85rem; }
