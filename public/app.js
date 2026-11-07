@@ -82,4 +82,8 @@ form.addEventListener('submit', async (e) => {
 dialog.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) dialog.close(); });
 $('#prev').addEventListener('click', () => { week = addDays(week, -7); load(); });
 $('#next').addEventListener('click', () => { week = addDays(week, 7); load(); });
-load();
+// Ouvre directement la semaine du prochain créneau (dans les 6 semaines).
+api(`/api/slots?from=${new Date().toISOString()}&to=${addDays(thisWeek, 42).toISOString()}`)
+  .then((next) => { if (next[0]) week = mondayOf(new Date(next[0].starts_at)); })
+  .catch(() => {})
+  .finally(load);
