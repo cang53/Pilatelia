@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Pilatelia — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="header header-row">
+      <p class="brand">Pilatelia <span class="muted">admin</span></p>
+      <button class="link" id="logout" hidden>Se déconnecter</button>
+    </header>
+
+    <form id="login" class="card">
+      <h1>Connexion</h1>
+      <label>Mot de passe <input type="password" name="password" autocomplete="current-password" required /></label>
+      <p class="error" id="loginError" role="alert"></p>
+      <button class="btn btn-wide">Entrer</button>
+    </form>
+
+    <div id="app" hidden>
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab" data-tab="planning" aria-selected="true">Planning</button>
+        <button role="tab" class="tab" data-tab="clients" aria-selected="false">Clientes</button>
+      </div>
+
+      <section id="planning">
+        <nav class="week" aria-label="Semaine">
+          <button class="icon-btn" id="prev" aria-label="Semaine précédente">‹</button>
+          <p id="weekLabel" aria-live="polite"></p>
+          <button class="icon-btn" id="next" aria-label="Semaine suivante">›</button>
+        </nav>
+
+        <form id="add" class="card">
+          <h2>Ajouter un créneau</h2>
+          <div class="grid">
+            <label>Jour <input type="date" name="date" required /></label>
+            <label>Heure <input type="time" name="time" required value="09:30" step="300" /></label>
+            <label>Durée (min) <input type="number" name="duration_minutes" required value="50" min="10" max="240" /></label>
+            <label>Places <input type="number" name="capacity" required value="8" min="1" max="100" /></label>
+            <label class="span-2">Intitulé <input name="title" value="Pilates" maxlength="80" /></label>
+          </div>
+          <div class="actions">
+            <button class="btn">Ajouter</button>
+            <button type="button" class="btn btn-ghost" id="copy">Copier la semaine précédente</button>
+          </div>
+        </form>
+
+        <div id="week" aria-live="polite"></div>
+      </section>
+
+      <section id="clients" hidden>
+        <div class="stats" id="stats"></div>
+        <div class="card">
+          <div class="header-row">
+            <h2>Clientes</h2>
+            <button class="btn btn-ghost" id="csv">Exporter CSV</button>
+          </div>
+          <div class="table-wrap"><table id="clientTable"></table></div>
+        </div>
+        <div class="card">
+          <h2>Réservations par mois</h2>
+          <table id="monthTable"></table>
+        </div>
+      </section>
+    </div>
+    <p class="toast" id="toast" role="status"></p>
+  </main>
+
+  <script src="common.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

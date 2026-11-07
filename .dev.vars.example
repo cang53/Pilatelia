@@ -1,4 +1,4 @@
-# Copier ce fichier vers .dev.vars pour développer en local.
-SUPABASE_URL=https://votre-projet.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_votre_cle_secrete
-
+# Copier vers .dev.vars pour le dev local.
+SUPABASE_URL=https://rhwpgcnqztrtymhoqsev.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_votre_cle
+ADMIN_PASSWORD=choisissez-un-mot-de-passe
