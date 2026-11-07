@@ -1,6 +1,6 @@
 {
   "name": "atelier-pilates-booking",
   "private": true,
-  "scripts": { "dev": "wrangler pages dev .", "deploy": "wrangler pages deploy ." },
+  "scripts": { "dev": "wrangler dev", "deploy": "wrangler deploy" },
   "devDependencies": { "wrangler": "^4.51.0" }
 }

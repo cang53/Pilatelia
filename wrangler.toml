@@ -1,4 +1,8 @@
 name = "pilatelia"
 compatibility_date = "2026-11-07"
-pages_build_output_dir = "."
+main = "src/worker.js"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
 
