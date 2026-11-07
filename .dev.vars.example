@@ -1,4 +1,4 @@
 # Copier ce fichier vers .dev.vars pour développer en local.
 SUPABASE_URL=https://votre-projet.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=votre_cle_service_role
+SUPABASE_SECRET_KEY=sb_secret_votre_cle_secrete
 
