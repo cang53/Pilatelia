@@ -130,7 +130,12 @@ export default {
       if (url.pathname.startsWith('/api/')) return json({ error: 'Introuvable.' }, 404);
     } catch (err) {
       if (err.detail) console.error(err.detail);
-      return json({ error: err instanceof HttpError ? err.message : 'Service indisponible.' }, err.status || 500);
+      let message = err instanceof HttpError ? err.message : 'Service indisponible.';
+      // L'admin est protégée : on lui montre la vraie erreur Supabase pour pouvoir corriger.
+      if (err.detail && url.pathname.startsWith('/api/admin/')) {
+        try { message += ` (${JSON.parse(err.detail).message})`; } catch { message += ` (${err.detail.slice(0, 200)})`; }
+      }
+      return json({ error: message }, err.status || 500);
     }
     return env.ASSETS.fetch(request);
   },

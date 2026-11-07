@@ -32,9 +32,10 @@ function showLogin(msg = '') {
 async function loadWeek() {
   $('#weekLabel').textContent = weekLabel(week);
   const form = $('#add');
-  form.date.min = ymd(week);
+  const today = ymd(new Date());
+  form.date.min = ymd(week) > today ? ymd(week) : today; // pas de créneau dans le passé
   form.date.max = ymd(addDays(week, 6));
-  if (!form.date.value || form.date.value < form.date.min || form.date.value > form.date.max) form.date.value = ymd(week);
+  if (!form.date.value || form.date.value < form.date.min || form.date.value > form.date.max) form.date.value = form.date.min;
   const slots = await adminApi(`/api/admin/slots?${weekQuery(week)}`);
   const days = byDay(slots);
   $('#week').innerHTML = Array.from({ length: 7 }, (_, i) => {
