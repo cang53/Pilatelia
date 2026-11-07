@@ -110,3 +110,4 @@ dialog form, dialog > div { display: grid; gap: 14px; }
   .slot { gap: 12px; padding: 12px; }
   .slot-head { flex-wrap: wrap; }
 }
+.past { opacity: .55; }

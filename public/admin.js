@@ -53,10 +53,11 @@ function slotCard(s) {
   const start = new Date(s.starts_at);
   const end = new Date(start.getTime() + s.duration_minutes * 60000);
   const n = s.bookings.length;
-  return `<div class="slot slot-admin">
+  const past = start < new Date();
+  return `<div class="slot slot-admin${past ? ' past' : ''}">
     <div class="slot-head">
       <p class="slot-time">${fmt.time.format(start)}<small>→ ${fmt.time.format(end)}</small></p>
-      <div class="slot-info"><strong>${esc(s.title)}</strong><span class="${n >= s.capacity ? 'full' : 'muted'}">${n} / ${s.capacity} inscrite${n > 1 ? 's' : ''}</span></div>
+      <div class="slot-info"><strong>${esc(s.title)}</strong><span class="${n >= s.capacity ? 'full' : 'muted'}">${n} / ${s.capacity} inscrite${n > 1 ? 's' : ''}${past ? ' · Passé, invisible pour les clientes' : ''}</span></div>
       <button class="link danger" data-del-slot="${s.id}" data-count="${n}">Supprimer</button>
     </div>
     ${n ? `<ul class="people">${s.bookings.map((b) => `<li>
@@ -84,13 +85,15 @@ $('#add').addEventListener('submit', async (e) => {
 $('#copy').addEventListener('click', async () => {
   try {
     const previous = await adminApi(`/api/admin/slots?${weekQuery(addDays(week, -7))}`);
-    if (!previous.length) return toast('La semaine précédente est vide.');
+    // Les jours déjà passés de la semaine sont ignorés.
+    const upcoming = previous.filter((s) => addDays(new Date(s.starts_at), 7) > new Date());
+    if (!upcoming.length) return toast('Rien à copier : la semaine précédente est vide ou ces jours sont passés.');
     if (Number($('#week').dataset.count) && !confirm('Cette semaine a déjà des créneaux. Ajouter quand même ceux de la semaine précédente ?')) return;
-    await adminApi('/api/admin/slots', { method: 'POST', body: JSON.stringify(previous.map((s) => ({
+    await adminApi('/api/admin/slots', { method: 'POST', body: JSON.stringify(upcoming.map((s) => ({
       starts_at: addDays(new Date(s.starts_at), 7).toISOString(), // garde l'heure locale même au changement d'heure
       duration_minutes: s.duration_minutes, capacity: s.capacity, title: s.title,
     }))) });
-    toast(previous.length > 1 ? `${previous.length} créneaux copiés` : '1 créneau copié');
+    toast(upcoming.length > 1 ? `${upcoming.length} créneaux copiés` : '1 créneau copié');
     loadWeek();
   } catch (err) { toast(err.message); }
 });

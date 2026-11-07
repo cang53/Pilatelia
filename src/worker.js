@@ -75,6 +75,7 @@ async function createSlots(request, env) {
     const starts = new Date(s.starts_at);
     const duration = Number(s.duration_minutes);
     const capacity = Number(s.capacity);
+    if (starts < Date.now()) throw new HttpError(400, 'Ce créneau est dans le passé : les clientes ne le verraient pas.');
     if (isNaN(starts) || !Number.isInteger(duration) || duration < 10 || duration > 240
       || !Number.isInteger(capacity) || capacity < 1 || capacity > 100) throw new HttpError(400, 'Créneau invalide.');
     return { starts_at: starts.toISOString(), duration_minutes: duration, capacity, title: String(s.title || 'Pilates').trim().slice(0, 80) || 'Pilates' };
