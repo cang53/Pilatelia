@@ -2,3 +2,13 @@
 SUPABASE_URL=https://rhwpgcnqztrtymhoqsev.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_votre_cle
 ADMIN_PASSWORD=choisissez-un-mot-de-passe
+
+# E-mail aux clientes (confirmation, annulation, rappel de la veille).
+# Sans RESEND_API_KEY + EMAIL_FROM, l'app marche mais n'envoie pas d'e-mail (tracé en logs).
+RESEND_API_KEY=re_votre_cle
+EMAIL_FROM=Pilatelia <reservations@votre-domaine.fr>
+
+# Coordonnées du studio (affichées côté cliente pour modifier/annuler, et en pied d'e-mail).
+STUDIO_NAME=Pilatelia Studio
+STUDIO_EMAIL=studio@votre-domaine.fr
+STUDIO_PHONE=06 12 34 56 78
