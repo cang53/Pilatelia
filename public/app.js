@@ -53,8 +53,9 @@ async function loadWeek() {
   }
   const withSlots = new Set(slots.map((s) => ymd(new Date(s.starts_at))));
   const todayKey = ymd(new Date());
-  // Jour sélectionné : premier jour de la semaine qui a des séances (ou aujourd'hui).
-  if (!selectedDay || !withSlots.has(selectedDay)) {
+  // Jour sélectionné : celui déjà choisi (par défaut aujourd'hui), sinon
+  // le premier jour de la semaine qui a des séances.
+  if (!selectedDay) {
     const firstDay = [...Array(7)].map((_, i) => ymd(addDays(week, i))).find((k) => withSlots.has(k));
     selectedDay = firstDay || (withSlots.has(todayKey) ? todayKey : ymd(week));
   }
@@ -253,9 +254,8 @@ $('#prev').addEventListener('click', () => { week = addDays(week, -7); selectedD
 $('#next').addEventListener('click', () => { week = addDays(week, 7); selectedDay = null; loadWeek(); });
 
 // ---------- Démarrage ----------
+// Par défaut, on ouvre sur la semaine courante avec le jour d'aujourd'hui sélectionné.
+week = thisWeek;
+selectedDay = ymd(new Date());
 api('/api/config').then((c) => { conf = c; }).catch(() => {}).finally(loadMine);
-// Ouvre la semaine du prochain créneau (dans les 6 semaines).
-api(`/api/slots?from=${new Date().toISOString()}&to=${addDays(thisWeek, 42).toISOString()}`)
-  .then((next) => { if (next[0]) week = mondayOf(new Date(next[0].starts_at)); })
-  .catch(() => {})
-  .finally(loadWeek);
+loadWeek();
