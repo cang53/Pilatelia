@@ -1,89 +1,254 @@
+const $ = (s) => document.querySelector(s);
 const thisWeek = mondayOf(new Date());
 let week = thisWeek;
 let slots = [];
-let chosen = null;
+let selectedDay = null;      // 'AAAA-MM-JJ'
+let chosen = null;           // séance choisie
+let conf = { studio_name: 'Pilatelia Studio', studio_email: '', studio_phone: '' };
+let mine = [];               // réservations de cet appareil
 
-const $ = (s) => document.querySelector(s);
-const list = $('#slots');
-const dialog = $('#dialog');
+const sheet = $('#sheet');
 const form = $('#form');
 
-async function load() {
+// Icônes statiques
+$('#prev').innerHTML = ic('chevronL');
+$('#next').innerHTML = ic('chevronR');
+$('#tabBookIc').innerHTML = ic('calendar');
+$('#tabMineIc').innerHTML = ic('checkCircle');
+$('#noteIc').innerHTML = ic('user');
+$('#doneIc').innerHTML = ic('check');
+
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+const describe = (s) => `${fmt.day.format(new Date(s.starts_at))} · ${fmt.time.format(new Date(s.starts_at))} · ${s.duration_minutes} min`;
+const upcomingCount = () => mine.filter((m) => new Date(m.slot.starts_at) > new Date()).length;
+
+function renderCount() {
+  const n = upcomingCount();
+  for (const el of [$('#count1'), $('#count2')]) {
+    el.hidden = false;
+    el.innerHTML = `${ic('check')} ${n} / 3`;
+  }
+}
+
+// ---------- Réserver ----------
+
+async function loadWeek() {
+  $('#monthLabel').textContent = fmt.month.format(week);
   $('#weekLabel').textContent = weekLabel(week);
   $('#prev').disabled = week <= thisWeek;
-  list.innerHTML = '<p class="empty">Chargement…</p>';
+  $('#slots').innerHTML = '<p class="empty">Chargement…</p>';
   try {
     slots = await api(`/api/slots?${weekQuery(week)}`);
-    render();
   } catch (err) {
-    list.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
-  }
-}
-
-function render() {
-  if (!slots.length) {
-    list.innerHTML = '<p class="empty">Aucun créneau disponible cette semaine.<br>Essayez la semaine suivante.</p>';
+    $('#days').innerHTML = '';
+    $('#slots').innerHTML = `<p class="empty">${esc(err.message)}</p>`;
     return;
   }
-  list.innerHTML = [...byDay(slots)].map(([day, items]) => `
-    <section class="day">
-      <h2>${fmt.day.format(new Date(`${day}T12:00`))}</h2>
-      ${items.map((s) => {
-        const left = s.capacity - s.booked;
-        return `<div class="slot">
-          <p class="slot-time">${fmt.time.format(new Date(s.starts_at))}<small>${s.duration_minutes} min</small></p>
-          <div class="slot-info"><strong>${esc(s.title)}</strong>
-            <span class="${left > 0 ? 'muted' : 'full'}">${left > 0 ? `${plural(left, 'place')} libre${left > 1 ? 's' : ''}` : 'Complet'}</span></div>
-          <button class="btn" data-id="${s.id}" ${left > 0 ? '' : 'disabled'}>Réserver</button>
-        </div>`;
-      }).join('')}
-    </section>`).join('');
+  const withSlots = new Set(slots.map((s) => ymd(new Date(s.starts_at))));
+  const todayKey = ymd(new Date());
+  // Jour sélectionné : premier jour de la semaine qui a des séances (ou aujourd'hui).
+  if (!selectedDay || !withSlots.has(selectedDay)) {
+    const firstDay = [...Array(7)].map((_, i) => ymd(addDays(week, i))).find((k) => withSlots.has(k));
+    selectedDay = firstDay || (withSlots.has(todayKey) ? todayKey : ymd(week));
+  }
+  renderDays(withSlots);
+  renderSlots();
 }
 
-const describe = (s) => `${fmt.day.format(new Date(s.starts_at))} à ${fmt.time.format(new Date(s.starts_at))} · ${s.duration_minutes} min`;
+function renderDays(withSlots) {
+  $('#days').innerHTML = [...Array(7)].map((_, i) => {
+    const d = addDays(week, i);
+    const key = ymd(d);
+    const cls = ['day', key === selectedDay ? 'on' : '', withSlots.has(key) ? 'has' : ''].filter(Boolean).join(' ');
+    return `<button class="${cls}" data-day="${key}"><span class="dow">${dowShort(d)}</span><span class="num">${d.getDate()}</span></button>`;
+  }).join('');
+}
 
-list.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-id]');
-  if (!btn) return;
-  chosen = slots.find((s) => s.id === btn.dataset.id);
-  $('#dialogTitle').textContent = chosen.title;
-  $('#dialogMeta').textContent = describe(chosen);
-  $('#formError').textContent = '';
-  form.hidden = false;
-  $('#done').hidden = true;
-  try { // pré-remplit pour les habituées
-    const saved = JSON.parse(localStorage.getItem('pilatelia-me') || '{}');
-    form.name.value ||= saved.name || '';
-    form.email.value ||= saved.email || '';
-  } catch {}
-  dialog.showModal();
+function renderSlots() {
+  const items = slots.filter((s) => ymd(new Date(s.starts_at)) === selectedDay);
+  const d = new Date(`${selectedDay}T12:00`);
+  if (!items.length) {
+    $('#slots').innerHTML = `<p class="subh">${fmt.day.format(d)}</p><p class="empty">Aucune séance ce jour-là.<br>Choisissez un autre jour.</p>`;
+    return;
+  }
+  $('#slots').innerHTML = `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p>
+    <div class="list">${items.map(slotCard).join('')}</div>`;
+}
+
+function slotCard(s) {
+  const left = s.capacity - s.booked;
+  const start = new Date(s.starts_at);
+  let pill;
+  if (left <= 0) pill = '<span class="pill full">Complet</span>';
+  else if (left <= 2) pill = `<span class="pill few">Plus qu'${plural(left, 'place')}</span>`;
+  else pill = `<span class="pill free">${plural(left, 'place')}</span>`;
+  return `<div class="card slot ${left <= 0 ? 'full-card' : ''}">
+    <div class="time"><div class="h">${fmt.time.format(start)}</div><div class="d">${s.duration_minutes} min</div></div>
+    <div class="body">
+      <div class="name">${esc(s.title)}</div>
+      ${s.coach ? `<div class="coach">avec ${esc(s.coach)}</div>` : ''}
+      <div class="foot">${pill}</div>
+    </div>
+    <button class="go" data-id="${s.id}" aria-label="Réserver" ${left <= 0 ? 'disabled' : ''}>${ic(left <= 0 ? 'close' : 'chevronR')}</button>
+  </div>`;
+}
+
+$('#days').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-day]');
+  if (!b) return;
+  selectedDay = b.dataset.day;
+  renderDays(new Set(slots.map((s) => ymd(new Date(s.starts_at)))));
+  renderSlots();
 });
+
+$('#slots').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-id]');
+  if (!b) return;
+  if (upcomingCount() >= 3) { toast('3 réservations maximum sur cet appareil. Annulez-en une pour réserver.'); return; }
+  chosen = slots.find((s) => s.id === b.dataset.id);
+  openSheet();
+});
+
+function openSheet() {
+  $('#sheetTitle').textContent = chosen.title;
+  $('#sheetMeta').textContent = describe(chosen);
+  $('#formError').textContent = '';
+  $('#bookStep').hidden = false;
+  $('#doneStep').hidden = true;
+  try {
+    const saved = JSON.parse(localStorage.getItem('pilatelia-me') || '{}');
+    if (!form.name.value) form.name.value = saved.name || '';
+    if (!form.email.value) form.email.value = saved.email || '';
+  } catch {}
+  sheet.showModal();
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const button = form.querySelector('[type=submit]');
-  button.disabled = true;
+  const btn = form.querySelector('[type=submit]');
+  btn.disabled = true;
   $('#formError').textContent = '';
-  const me = { name: form.name.value, email: form.email.value };
+  const me = { name: form.name.value.trim(), email: form.email.value.trim() };
   try {
-    await api('/api/book', { method: 'POST', body: JSON.stringify({ slot_id: chosen.id, ...me }) });
+    const res = await api('/api/book', { method: 'POST', body: JSON.stringify({ slot_id: chosen.id, ...me }) });
     try { localStorage.setItem('pilatelia-me', JSON.stringify(me)); } catch {}
-    $('#doneText').textContent = `${chosen.title}, ${describe(chosen)}. À bientôt !`;
-    form.hidden = true;
-    $('#done').hidden = false;
-    load();
+    if (res.id) addMyId(res.id);
+    showDone();
+    await Promise.all([loadMine(), loadWeek()]);
   } catch (err) {
     $('#formError').textContent = err.message;
   } finally {
-    button.disabled = false;
+    btn.disabled = false;
   }
 });
 
-dialog.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) dialog.close(); });
-$('#prev').addEventListener('click', () => { week = addDays(week, -7); load(); });
-$('#next').addEventListener('click', () => { week = addDays(week, 7); load(); });
-// Ouvre directement la semaine du prochain créneau (dans les 6 semaines).
+function showDone() {
+  const s = chosen;
+  const d = new Date(s.starts_at);
+  $('#doneTicket').innerHTML = `
+    <div class="main">
+      <div class="date"><div class="dow">${dowShort(d)}</div><div class="num">${d.getDate()}</div></div>
+      <div><div class="name" style="font-weight:700">${esc(s.title)}</div>
+      <div class="muted small">${fmt.time.format(d)} · ${s.duration_minutes} min${s.coach ? ` · avec ${esc(s.coach)}` : ''}</div></div>
+    </div>
+    <div class="perf">${ic('mail')}<p>Un <strong>e-mail de confirmation</strong> vient de partir. Rappel la veille. Pour changer, répondez à cet e-mail ou appelez le studio.</p></div>`;
+  $('#bookStep').hidden = true;
+  $('#doneStep').hidden = false;
+}
+
+// ---------- Ma réservation ----------
+
+async function loadMine() {
+  const ids = myIds();
+  if (!ids.length) { mine = []; renderMine(); renderCount(); return; }
+  try {
+    mine = await api('/api/my', { method: 'POST', body: JSON.stringify({ ids }) });
+    saveMyIds(mine.map((m) => m.id)); // oublie les réservations supprimées/annulées
+  } catch { /* garde l'état précédent */ }
+  renderMine();
+  renderCount();
+}
+
+function contactBlock() {
+  const mail = conf.studio_email ? `<a class="btn btn-primary" href="mailto:${esc(conf.studio_email)}?subject=${encodeURIComponent('Ma réservation Pilatelia')}">${ic('mail')} Écrire</a>` : '';
+  const tel = conf.studio_phone ? `<a class="btn btn-secondary" href="tel:${esc(conf.studio_phone.replace(/\s/g, ''))}">${ic('phone')} Appeler</a>` : '';
+  return `<div class="card">
+    <h2 style="font-size:16px;margin-bottom:4px">Besoin de changer ?</h2>
+    <p class="muted small" style="margin:0 0 14px">Tout se gère avec le studio. L'annulation reste possible à tout moment ; une modification n'est plus possible dans les 24h.</p>
+    <div class="actions-2">${mail}${tel}</div>
+  </div>`;
+}
+
+function renderMine() {
+  const now = new Date();
+  const upcoming = mine.filter((m) => new Date(m.slot.starts_at) >= now);
+  const past = mine.filter((m) => new Date(m.slot.starts_at) < now);
+  if (!upcoming.length) {
+    $('#mine').innerHTML = `<div class="empty">Aucune réservation en cours.<br>Rendez-vous dans « Réserver » pour choisir une séance.</div>
+      ${(conf.studio_email || conf.studio_phone) ? contactBlock() : ''}`;
+    return;
+  }
+  const card = (m) => {
+    const d = new Date(m.slot.starts_at);
+    const limit = new Date(d.getTime() - 86400000);
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="slot" style="align-items:flex-start">
+        <div class="time" style="min-width:54px"><div class="date" style="text-align:center"></div>
+          <div style="background:var(--brand-tint);border-radius:var(--radius-md);padding:8px 0">
+            <div class="dow" style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--brand-strong)">${dowShort(d)}</div>
+            <div style="font-family:var(--serif);font-size:22px;font-weight:600;color:var(--brand)">${d.getDate()}</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="name">${esc(m.slot.title)}</div>
+          <div class="coach">${fmt.time.format(d)} · ${m.slot.duration_minutes} min</div>
+          <span class="status">${ic('check')} Confirmée</span>
+          <div class="lock">${ic('lock')} Modifiable jusqu'au ${fmt.day.format(limit)} à ${fmt.time.format(limit)} (24h avant).</div>
+        </div>
+      </div>
+    </div>`;
+  };
+  $('#mine').innerHTML = upcoming.map(card).join('')
+    + contactBlock()
+    + `<div class="note" style="margin-top:12px">${ic('info')}<p>Sans compte : vos réservations sont gardées sur cet appareil, dans la limite de 3 à la fois.</p></div>`
+    + (past.length ? `<p class="subh" style="margin-top:18px">Déjà passées</p>${past.map((m) => {
+        const d = new Date(m.slot.starts_at);
+        return `<div class="card slot full-card" style="margin-bottom:10px"><div class="time"><div class="h">${d.getDate()}/${d.getMonth() + 1}</div><div class="d">${fmt.time.format(d)}</div></div><div class="body"><div class="name">${esc(m.slot.title)}</div></div></div>`;
+      }).join('')}` : '');
+}
+
+// ---------- Navigation ----------
+
+function switchView(view) {
+  document.querySelectorAll('[data-view]').forEach((t) => t.classList.toggle('on', t.dataset.view === view));
+  $('#view-book').hidden = view !== 'book';
+  $('#view-mine').hidden = view !== 'mine';
+  if (view === 'mine') loadMine();
+}
+
+document.querySelector('.tabbar').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-view]');
+  if (t) switchView(t.dataset.view);
+});
+sheet.addEventListener('click', (e) => {
+  if (e.target === sheet) sheet.close();           // clic sur le fond
+  if (e.target.closest('[data-close]')) { sheet.close(); switchView('mine'); }
+});
+
+$('#prev').addEventListener('click', () => { week = addDays(week, -7); selectedDay = null; loadWeek(); });
+$('#next').addEventListener('click', () => { week = addDays(week, 7); selectedDay = null; loadWeek(); });
+
+// ---------- Démarrage ----------
+api('/api/config').then((c) => { conf = c; }).catch(() => {}).finally(loadMine);
+// Ouvre la semaine du prochain créneau (dans les 6 semaines).
 api(`/api/slots?from=${new Date().toISOString()}&to=${addDays(thisWeek, 42).toISOString()}`)
   .then((next) => { if (next[0]) week = mondayOf(new Date(next[0].starts_at)); })
   .catch(() => {})
-  .finally(load);
+  .finally(loadWeek);

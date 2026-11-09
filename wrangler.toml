@@ -8,3 +8,7 @@ keep_vars = true
 directory = "./public"
 binding = "ASSETS"
 
+# Rappel e-mail de la veille : vérifie chaque heure les séances dans ~24h.
+[triggers]
+crons = ["0 * * * *"]
+
