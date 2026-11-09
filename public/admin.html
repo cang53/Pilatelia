@@ -29,6 +29,7 @@
         <button data-tab="prestations">Prestations</button>
         <button data-tab="finances">Finances</button>
         <button data-tab="clients">Clientes</button>
+        <button data-tab="studio">Studio</button>
       </div>
 
       <!-- Agenda (grille semaine) -->
@@ -86,6 +87,23 @@
           </div>
           <div class="table-wrap"><table id="clientTable"></table></div>
         </div>
+      </section>
+
+      <!-- Studio -->
+      <section id="studio" hidden>
+        <p class="repeat"><span id="studioIc"></span><span>Ces infos s'affichent côté clientes et dans les e-mails (confirmation, rappel, annulation).</span></p>
+        <form id="studioForm" class="card">
+          <h2 style="font-size:18px;margin-bottom:12px">Mon studio</h2>
+          <label>Nom du studio <input name="name" maxlength="120" placeholder="Pilatelia Studio" /></label>
+          <label>Adresse <textarea name="address" maxlength="400" rows="2" placeholder="12 rue du Calme, 1000 Bruxelles"></textarea></label>
+          <div class="grid2">
+            <label>E-mail <input name="email" type="email" maxlength="160" placeholder="studio@…" /></label>
+            <label>Téléphone <input name="phone" maxlength="60" placeholder="06 12 34 56 78" /></label>
+          </div>
+          <label>Instagram <input name="instagram" maxlength="160" placeholder="@pilatelia" /></label>
+          <p class="error" id="studioError" role="alert"></p>
+          <button class="btn btn-primary btn-block">Enregistrer</button>
+        </form>
       </section>
     </div>
   </main>
