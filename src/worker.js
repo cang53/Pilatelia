@@ -39,6 +39,7 @@ function studio(env) {
     name: env.STUDIO_NAME || 'Pilatelia Studio',
     email: env.STUDIO_EMAIL || '',
     phone: env.STUDIO_PHONE || '',
+    instagram: env.STUDIO_INSTAGRAM || '',
   };
 }
 
@@ -104,15 +105,23 @@ function reminderEmail(env, slot) {
 
 // ---------- Public ----------
 
+// Instagram : accepte un @pseudo ou une URL, renvoie une URL propre.
+function instagramUrl(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return '';
+  if (/^https?:\/\//i.test(v)) return v;
+  return `https://instagram.com/${v.replace(/^@/, '')}`;
+}
+
 async function config(env) {
   const s = studio(env);
-  return json({ studio_name: s.name, studio_email: s.email, studio_phone: s.phone });
+  return json({ studio_name: s.name, studio_email: s.email, studio_phone: s.phone, studio_instagram: instagramUrl(s.instagram) });
 }
 
 async function publicSlots(url, env) {
   const { from, to } = range(url);
   const start = new Date(Math.max(from, Date.now())).toISOString();
-  const rows = await db(env, `classes?select=id,title,starts_at,duration_minutes,capacity,bookings(count)`
+  const rows = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes,capacity,price_cents,bookings(count)`
     + `&starts_at=gte.${encodeURIComponent(start)}&starts_at=lt.${encodeURIComponent(to.toISOString())}&order=starts_at`);
   return json(rows.map(({ bookings, ...slot }) => ({ ...slot, booked: bookings[0]?.count ?? 0 })));
 }
@@ -178,10 +187,16 @@ async function createSlots(request, env) {
     const starts = new Date(s.starts_at);
     const duration = Number(s.duration_minutes);
     const capacity = Number(s.capacity);
+    const price = Math.round(Number(s.price_cents) || 0);
     if (starts < Date.now()) throw new HttpError(400, 'Ce créneau est dans le passé : les clientes ne le verraient pas.');
     if (isNaN(starts) || !Number.isInteger(duration) || duration < 10 || duration > 240
-      || !Number.isInteger(capacity) || capacity < 1 || capacity > 100) throw new HttpError(400, 'Créneau invalide.');
-    return { starts_at: starts.toISOString(), duration_minutes: duration, capacity, title: String(s.title || 'Pilates').trim().slice(0, 80) || 'Pilates' };
+      || !Number.isInteger(capacity) || capacity < 1 || capacity > 100
+      || price < 0 || price > 1000000) throw new HttpError(400, 'Créneau invalide.');
+    return {
+      starts_at: starts.toISOString(), duration_minutes: duration, capacity, price_cents: price,
+      title: String(s.title || 'Pilates').trim().slice(0, 80) || 'Pilates',
+      coach: String(s.coach || '').trim().slice(0, 80) || null,
+    };
   });
   return json(await db(env, 'classes', { method: 'POST', body: JSON.stringify(rows) }), 201);
 }
@@ -239,6 +254,75 @@ async function report(env) {
   });
 }
 
+// ---------- Prestations (catalogue) ----------
+
+async function listServices(env) {
+  return json(await db(env, 'services?select=*&order=sort,created_at'));
+}
+
+async function createService(request, env) {
+  const s = await request.json().catch(() => ({}));
+  const name = String(s.name || '').trim().slice(0, 80);
+  const duration = Number(s.duration_minutes);
+  const capacity = Number(s.capacity);
+  const price = Math.round(Number(s.price_cents) || 0);
+  if (!name || !Number.isInteger(duration) || duration < 10 || duration > 240
+    || !Number.isInteger(capacity) || capacity < 1 || capacity > 100
+    || price < 0 || price > 1000000) throw new HttpError(400, 'Prestation invalide.');
+  const row = {
+    name, duration_minutes: duration, capacity, price_cents: price,
+    coach: String(s.coach || '').trim().slice(0, 80) || null,
+    sort: Math.round(Number(s.sort) || 0),
+  };
+  return json(await db(env, 'services', { method: 'POST', body: JSON.stringify(row) }), 201);
+}
+
+async function removeService(url, env) {
+  const id = url.searchParams.get('id');
+  if (!UUID.test(id || '')) throw new HttpError(400, 'Identifiant invalide.');
+  await db(env, `services?id=eq.${id}`, { method: 'DELETE' });
+  return json({ ok: true });
+}
+
+// ---------- Dashboard financier ----------
+
+function weekStartIso(d) {
+  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
+  return x.toISOString().slice(0, 10);
+}
+
+async function finance(env) {
+  // CA = somme des prix figés des séances, par réservation honorée (séance passée) ou à venir.
+  const rows = await db(env, 'bookings?select=created_at,classes(starts_at,price_cents,title)&order=created_at');
+  const now = Date.now();
+  const weeks = new Map();   // lundi ISO -> { revenue, bookings }
+  const services = new Map();
+  let revenuePast = 0, revenueUpcoming = 0, bookingsUpcoming = 0;
+  for (const r of rows) {
+    if (!r.classes) continue;
+    const at = new Date(r.classes.starts_at).getTime();
+    const price = r.classes.price_cents || 0;
+    const wk = weekStartIso(new Date(at));
+    const w = weeks.get(wk) || { week: wk, revenue: 0, bookings: 0 };
+    w.revenue += price; w.bookings += 1; weeks.set(wk, w);
+    const title = r.classes.title || 'Pilates';
+    const sv = services.get(title) || { title, revenue: 0, bookings: 0 };
+    sv.revenue += price; sv.bookings += 1; services.set(title, sv);
+    if (at > now) { revenueUpcoming += price; bookingsUpcoming += 1; } else revenuePast += price;
+  }
+  const thisWeek = weekStartIso(new Date(now));
+  const weekList = [...weeks.values()].sort((a, b) => b.week.localeCompare(a.week)).slice(0, 12);
+  return json({
+    this_week: weeks.get(thisWeek) || { week: thisWeek, revenue: 0, bookings: 0 },
+    revenue_past: revenuePast,
+    revenue_upcoming: revenueUpcoming,
+    bookings_upcoming: bookingsUpcoming,
+    weeks: weekList,
+    services: [...services.values()].sort((a, b) => b.revenue - a.revenue),
+  });
+}
+
 async function admin(request, url, env, ctx) {
   if (!(await isAdmin(request, env))) return json({ error: 'Mot de passe incorrect.' }, 401);
   const route = `${request.method} ${url.pathname}`;
@@ -247,6 +331,10 @@ async function admin(request, url, env, ctx) {
   if (route === 'DELETE /api/admin/slots') return removeSlot(url, env);
   if (route === 'DELETE /api/admin/bookings') return removeBooking(url, env, ctx);
   if (route === 'GET /api/admin/report') return report(env);
+  if (route === 'GET /api/admin/services') return listServices(env);
+  if (route === 'POST /api/admin/services') return createService(request, env);
+  if (route === 'DELETE /api/admin/services') return removeService(url, env);
+  if (route === 'GET /api/admin/finance') return finance(env);
   return json({ error: 'Introuvable.' }, 404);
 }
 
