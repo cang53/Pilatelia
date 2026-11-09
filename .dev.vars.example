@@ -12,6 +12,10 @@ EMAIL_FROM=Pilatelia <reservations@votre-domaine.fr>
 STUDIO_NAME=Pilatelia Studio
 STUDIO_EMAIL=studio@votre-domaine.fr
 STUDIO_PHONE=06 12 34 56 78
+STUDIO_ADDRESS=12 rue du Calme, 1000 Bruxelles
 
 # Instagram du studio : @pseudo ou URL. Alimente le bouton "Abonnements" côté cliente.
 STUDIO_INSTAGRAM=@pilatelia
+
+# Astuce : ces valeurs ne sont que des défauts. La prof peut tout modifier dans
+# l'admin (onglet Studio) ; ce qu'elle saisit là prime sur ces variables.

@@ -12,6 +12,7 @@ $('[data-week="1"]').innerHTML = ic('chevronR');
 $('#addBtn').innerHTML = `${ic('plus')} Ajouter un cours`;
 $('#exportBtn').innerHTML = `${ic('instagram')} Story`;
 $('#presIc').innerHTML = ic('tag');
+$('#studioIc').innerHTML = ic('edit');
 $('#shareStory').innerHTML = `${ic('share')} Partager la story`;
 $('#saveStory').innerHTML = `${ic('download')} Enregistrer la photo`;
 
@@ -102,7 +103,15 @@ function openSession(id) {
     <p class="meta">${fmt.day.format(d)} · ${fmt.time.format(d)} · ${s.duration_minutes} min${s.coach ? ` · ${esc(s.coach)}` : ''}${s.price_cents ? ` · ${euro(s.price_cents)}` : ''}</p>
     <div class="session-cap"><span class="scap ${full(s) ? 'few' : ''}">${n}/${s.capacity} inscrite${n > 1 ? 's' : ''}</span></div>
     <div class="att">${people}</div>
-    <button class="btn btn-secondary btn-block" style="margin-top:16px;color:var(--danger)" data-del-slot="${s.id}" data-count="${n}">${ic('trash')} Supprimer ce cours</button>
+    <form id="addPersonForm" data-class="${s.id}" class="addperson">
+      <div class="grid2">
+        <label>Prénom et nom <input name="name" required maxlength="100" /></label>
+        <label>E-mail <input name="email" type="email" required maxlength="160" /></label>
+      </div>
+      <p class="error" id="addPersonError"></p>
+      <button class="btn btn-secondary btn-block" type="submit">${ic('plus')} Inscrire cette personne</button>
+    </form>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px;color:var(--danger)" data-del-slot="${s.id}" data-count="${n}">${ic('trash')} Supprimer ce cours</button>
     <button class="btn btn-ghost btn-block" data-close style="margin-top:4px">Fermer</button>`;
   $('#sessionSheet').showModal();
 }
@@ -131,6 +140,25 @@ $('#sessionSheet').addEventListener('click', async (e) => {
       if (current) openSession(current); else $('#sessionSheet').close();
     }
   } catch (err) { toast(err.message); }
+});
+
+// Inscription manuelle d'une personne depuis le détail de cours.
+$('#sessionSheet').addEventListener('submit', async (e) => {
+  const f = e.target.closest('#addPersonForm');
+  if (!f) return;
+  e.preventDefault();
+  $('#addPersonError').textContent = '';
+  const classId = f.dataset.class;
+  try {
+    await adminApi('/api/admin/bookings', { method: 'POST', body: JSON.stringify({
+      class_id: classId,
+      name: f.querySelector('[name="name"]').value.trim(),
+      email: f.querySelector('[name="email"]').value.trim(),
+    }) });
+    toast('Personne inscrite · e-mail envoyé');
+    await loadAgenda();
+    openSession(classId);
+  } catch (err) { $('#addPersonError').textContent = err.message; }
 });
 
 // ---------- Ajouter un cours ----------
@@ -348,7 +376,31 @@ $('#shareStory').addEventListener('click', async () => {
 
 // ---------- Navigation ----------
 
-const loaders = { agenda: loadAgenda, prestations: loadServices, finances: loadFinance, clients: loadReport };
+// ---------- Studio (paramètres) ----------
+
+async function loadStudioSettings() {
+  const s = await adminApi('/api/admin/studio');
+  const f = $('#studioForm');
+  f.name.value = s.name || '';
+  f.address.value = s.address || '';
+  f.email.value = s.email || '';
+  f.phone.value = s.phone || '';
+  f.instagram.value = s.instagram || '';
+}
+
+$('#studioForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  $('#studioError').textContent = '';
+  try {
+    await adminApi('/api/admin/studio', { method: 'POST', body: JSON.stringify({
+      name: f.name.value, address: f.address.value, email: f.email.value, phone: f.phone.value, instagram: f.instagram.value,
+    }) });
+    toast('Infos studio enregistrées');
+  } catch (err) { $('#studioError').textContent = err.message; }
+});
+
+const loaders = { agenda: loadAgenda, prestations: loadServices, finances: loadFinance, clients: loadReport, studio: loadStudioSettings };
 document.querySelector('.seg').addEventListener('click', (e) => {
   const t = e.target.closest('[data-tab]');
   if (!t) return;

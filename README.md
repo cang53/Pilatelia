@@ -8,6 +8,8 @@ Studio réservé aux femmes. Interface mobile, **sans compte** : la cliente rés
   - **Prestations** — catalogue des activités avec **tarif**, durée, places ; sélectionnable à l'ajout d'un cours. Le tarif s'affiche côté cliente.
   - **Finances** — dashboard : CA de la semaine, à venir, encaissé, par semaine et par prestation.
   - **Clientes** — stats, tableau (dont annulations tardives), export CSV.
+  - **Studio** — nom, **adresse**, e-mail, téléphone, Instagram, modifiables directement (priment sur les variables d'env). L'adresse apparaît côté cliente et dans les e-mails.
+  - **Inscription manuelle** — depuis le détail d'un cours, la prof peut inscrire une personne (nom + e-mail) ; la cliente reçoit l'e-mail de confirmation.
 
 Un seul Cloudflare Worker sert le site et l'API ; la clé Supabase et le mot de passe admin restent côté serveur.
 
@@ -25,7 +27,7 @@ npx supabase link --project-ref rhwpgcnqztrtymhoqsev
 npx supabase db push
 ```
 
-Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; et `..._pilatelia_v3.sql` : prestations + tarif par séance). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
+Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
 
 ## 2. Site (Cloudflare Workers)
 
@@ -41,6 +43,7 @@ npx wrangler secret put EMAIL_FROM            # "Pilatelia <reservations@votre-d
 npx wrangler secret put STUDIO_NAME           # Pilatelia Studio
 npx wrangler secret put STUDIO_EMAIL          # contact affiché aux clientes
 npx wrangler secret put STUDIO_PHONE          # contact affiché aux clientes
+npx wrangler secret put STUDIO_ADDRESS        # adresse (affichée aux clientes + e-mails) — modifiable dans l'admin
 npx wrangler secret put STUDIO_INSTAGRAM      # @pseudo ou URL (bouton "Abonnements")
 npm run deploy
 ```

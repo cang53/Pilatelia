@@ -166,6 +166,7 @@ function showDone() {
       <div><div class="name" style="font-weight:700">${esc(s.title)}</div>
       <div class="muted small">${fmt.time.format(d)} · ${s.duration_minutes} min${s.coach ? ` · avec ${esc(s.coach)}` : ''}</div></div>
     </div>
+    ${conf.studio_address ? `<div class="perf" style="background:var(--sage-tint)">${ic('info')}<p><strong>Adresse</strong><br>${esc(conf.studio_address)}</p></div>` : ''}
     <div class="perf">${ic('mail')}<p>Un <strong>e-mail de confirmation</strong> vient de partir. Rappel la veille. Pour changer, répondez à cet e-mail ou appelez le studio.</p></div>`;
   $('#bookStep').hidden = true;
   $('#doneStep').hidden = false;
@@ -191,6 +192,7 @@ function contactBlock() {
     <h2 style="font-size:16px;margin-bottom:4px">Besoin de changer ?</h2>
     <p class="muted small" style="margin:0 0 14px">Tout se gère avec le studio. L'annulation reste possible à tout moment ; une modification n'est plus possible dans les 24h.</p>
     <div class="actions-2">${mail}${tel}</div>
+    ${conf.studio_address ? `<div class="lock" style="color:var(--ink-muted)">${ic('info')} ${esc(conf.studio_address)}</div>` : ''}
   </div>`;
 }
 
