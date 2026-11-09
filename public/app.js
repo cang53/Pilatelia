@@ -26,7 +26,7 @@ function toast(msg) {
   toast.t = setTimeout(() => el.classList.remove('show'), 3200);
 }
 
-const describe = (s) => `${fmt.day.format(new Date(s.starts_at))} · ${fmt.time.format(new Date(s.starts_at))} · ${s.duration_minutes} min`;
+const describe = (s) => `${fmt.day.format(new Date(s.starts_at))} · ${fmt.time.format(new Date(s.starts_at))} · ${s.duration_minutes} min${s.price_cents ? ` · ${euro(s.price_cents)}` : ''}`;
 const upcomingCount = () => mine.filter((m) => new Date(m.slot.starts_at) > new Date()).length;
 
 function renderCount() {
@@ -71,15 +71,22 @@ function renderDays(withSlots) {
   }).join('');
 }
 
+function subscribeCard() {
+  if (!conf.studio_instagram) return '';
+  return `<a class="card sub-card" href="${esc(conf.studio_instagram)}" target="_blank" rel="noopener">
+    <span class="sub-ic">${ic('instagram')}</span>
+    <span class="sub-body"><span class="sub-title">Abonnements &amp; formules</span><span class="muted small">Nos offres et cartes de séances, c'est sur Instagram.</span></span>
+    ${ic('chevronR')}
+  </a>`;
+}
+
 function renderSlots() {
   const items = slots.filter((s) => ymd(new Date(s.starts_at)) === selectedDay);
   const d = new Date(`${selectedDay}T12:00`);
-  if (!items.length) {
-    $('#slots').innerHTML = `<p class="subh">${fmt.day.format(d)}</p><p class="empty">Aucune séance ce jour-là.<br>Choisissez un autre jour.</p>`;
-    return;
-  }
-  $('#slots').innerHTML = `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p>
-    <div class="list">${items.map(slotCard).join('')}</div>`;
+  const body = items.length
+    ? `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p><div class="list">${items.map(slotCard).join('')}</div>`
+    : `<p class="subh">${fmt.day.format(d)}</p><p class="empty">Aucune séance ce jour-là.<br>Choisissez un autre jour.</p>`;
+  $('#slots').innerHTML = body + subscribeCard();
 }
 
 function slotCard(s) {
@@ -94,7 +101,7 @@ function slotCard(s) {
     <div class="body">
       <div class="name">${esc(s.title)}</div>
       ${s.coach ? `<div class="coach">avec ${esc(s.coach)}</div>` : ''}
-      <div class="foot">${pill}</div>
+      <div class="foot">${pill}${s.price_cents ? `<span class="price">${euro(s.price_cents)}</span>` : ''}</div>
     </div>
     <button class="go" data-id="${s.id}" aria-label="Réserver" ${left <= 0 ? 'disabled' : ''}>${ic(left <= 0 ? 'close' : 'chevronR')}</button>
   </div>`;

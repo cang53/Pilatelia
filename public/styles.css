@@ -209,6 +209,54 @@ th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--border)
 th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); font-weight:700; }
 td.num, th.num { text-align:right; }
 
+/* Carte abonnement (cliente) */
+.sub-card { display:flex; align-items:center; gap:14px; margin-top:14px; text-decoration:none; color:var(--ink); }
+.sub-ic { width:44px; height:44px; flex:0 0 auto; border-radius:var(--radius-md); background:var(--brand-tint); color:var(--brand);
+  display:flex; align-items:center; justify-content:center; }
+.sub-ic svg { width:22px; height:22px; }
+.sub-body { flex:1; display:flex; flex-direction:column; }
+.sub-title { font-weight:700; font-size:15px; }
+.sub-card > svg { width:18px; height:18px; color:var(--ink-faint); flex:0 0 auto; }
+
+/* Segmented scrollable (admin, 4 onglets) */
+.seg.scroll { overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.seg.scroll::-webkit-scrollbar { display:none; }
+.seg.scroll button { flex:0 0 auto; padding:12px 18px; }
+
+/* Agenda : actions + grille semaine */
+.agenda-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.agenda-actions .btn { padding:11px 16px; font-size:14px; }
+.grid-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:var(--radius-lg);
+  background:var(--surface-100); box-shadow:var(--shadow-sm); }
+.timetable { border-collapse:collapse; width:100%; min-width:760px; }
+.timetable th, .timetable td { border:1px solid var(--border); vertical-align:top; }
+.timetable thead th { background:var(--surface-200); padding:10px 6px; position:sticky; top:0; z-index:2; }
+.timetable thead th .dw { display:block; font-size:12px; font-weight:700; text-transform:uppercase; color:var(--ink-muted); }
+.timetable thead th .dn { display:block; font-family:var(--serif); font-size:20px; font-weight:600; }
+.timetable thead th.today .dn { color:var(--brand); }
+.timetable .hcol { position:sticky; left:0; z-index:1; background:var(--surface-200); width:52px; min-width:52px;
+  font-size:14px; font-weight:700; color:var(--ink-muted); text-align:center; padding:8px 4px; }
+.timetable thead .hcol { z-index:3; }
+.timetable td { padding:4px; min-width:108px; height:58px; }
+.cell-sess { width:100%; border:none; text-align:left; background:var(--brand-tint); border-radius:10px; padding:7px 9px;
+  display:flex; flex-direction:column; gap:1px; margin-bottom:4px; color:var(--ink); }
+.cell-sess:last-child { margin-bottom:0; }
+.cell-sess.full { background:var(--surface-200); }
+.cs-t { font-weight:700; font-size:15px; }
+.cs-n { font-size:13px; font-weight:600; }
+.cs-c { font-size:12px; color:var(--ink-muted); }
+
+/* Détail de cours (feuille) */
+.session-cap { margin:8px 0 2px; }
+#sessionBody .att { border-top:1px solid var(--border); margin-top:14px; padding-top:14px; }
+
+/* Prestations */
+.svc { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.svc-main { flex:1; min-width:0; }
+.svc-name { font-weight:700; font-size:16px; }
+.svc-price { font-family:var(--serif); font-size:20px; font-weight:600; color:var(--brand); }
+.svc .rm svg { width:20px; height:20px; }
+
 /* Toast */
 .toast { position:fixed; left:50%; bottom:calc(104px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(10px);
   background:var(--ink); color:var(--surface-50); font-size:14px; font-weight:600; padding:12px 18px; border-radius:var(--radius-pill);

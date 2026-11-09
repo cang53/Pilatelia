@@ -24,48 +24,56 @@
     </form>
 
     <div id="app" hidden>
-      <div class="seg" role="tablist">
+      <div class="seg scroll" role="tablist">
         <button class="on" data-tab="agenda">Agenda</button>
-        <button data-tab="dispos">Disponibilités</button>
+        <button data-tab="prestations">Prestations</button>
+        <button data-tab="finances">Finances</button>
         <button data-tab="clients">Clientes</button>
       </div>
 
-      <!-- Agenda -->
+      <!-- Agenda (grille semaine) -->
       <section id="agenda">
         <nav class="week" aria-label="Semaine">
-          <button class="nav-btn" data-week="agenda" data-dir="-1" aria-label="Semaine précédente"></button>
+          <button class="nav-btn" data-week="-1" aria-label="Semaine précédente"></button>
           <span class="label" id="agendaLabel" aria-live="polite"></span>
-          <button class="nav-btn" data-week="agenda" data-dir="1" aria-label="Semaine suivante"></button>
+          <button class="nav-btn" data-week="1" aria-label="Semaine suivante"></button>
         </nav>
-        <div id="agendaList" aria-live="polite"></div>
-        <div class="barbtn">
-          <button class="btn btn-primary btn-block" id="exportBtn"></button>
+        <div class="agenda-actions">
+          <button class="btn btn-primary" id="addBtn"></button>
+          <button class="btn btn-secondary" id="copyBtn">Copier semaine préc.</button>
+          <button class="btn btn-secondary" id="exportBtn"></button>
         </div>
+        <div id="grid" aria-live="polite"></div>
       </section>
 
-      <!-- Disponibilités -->
-      <section id="dispos" hidden>
-        <div class="repeat"><span id="repeatIc"></span><p>Ajoutez vos cours semaine par semaine. Option « répéter chaque semaine » pour une séance qui revient.</p></div>
-        <form id="add" class="card" style="margin-bottom:14px">
-          <h2 style="font-size:18px;margin-bottom:12px">Ajouter un cours</h2>
+      <!-- Prestations -->
+      <section id="prestations" hidden>
+        <p class="repeat"><span id="presIc"></span><span>Vos activités et leurs tarifs. À l'ajout d'un cours à l'agenda, vous choisirez une prestation.</span></p>
+        <form id="svcForm" class="card" style="margin-bottom:14px">
+          <h2 style="font-size:18px;margin-bottom:12px">Nouvelle prestation</h2>
           <div class="grid2">
-            <label>Jour <input type="date" name="date" required /></label>
-            <label>Heure <input type="time" name="time" required value="09:00" step="300" /></label>
-            <label>Durée (min) <input type="number" name="duration_minutes" required value="55" min="10" max="240" /></label>
-            <label>Places <input type="number" name="capacity" required value="6" min="1" max="100" /></label>
-            <label class="span2">Intitulé <input name="title" value="Pilates Reformer" maxlength="80" /></label>
-            <label class="span2">Répéter chaque semaine jusqu'au <input type="date" name="until" />
-              <small class="muted">Laisser vide pour une seule séance.</small></label>
+            <label class="span2">Nom <input name="name" required maxlength="80" placeholder="Pilates Reformer" /></label>
+            <label>Tarif (€) <input name="price" type="number" min="0" max="1000" step="0.5" value="20" required /></label>
+            <label>Durée (min) <input name="duration_minutes" type="number" min="10" max="240" value="55" required /></label>
+            <label>Places <input name="capacity" type="number" min="1" max="100" value="6" required /></label>
+            <label>Intervenante <input name="coach" maxlength="80" placeholder="(optionnel)" /></label>
           </div>
-          <button class="btn btn-primary btn-block" style="margin-top:4px">Ajouter</button>
-          <button type="button" class="btn btn-ghost btn-block" id="copy" style="margin-top:8px">Copier la semaine précédente</button>
+          <button class="btn btn-primary btn-block" style="margin-top:4px">Ajouter la prestation</button>
         </form>
-        <nav class="week" aria-label="Semaine">
-          <button class="nav-btn" data-week="dispos" data-dir="-1" aria-label="Semaine précédente"></button>
-          <span class="label" id="disposLabel" aria-live="polite"></span>
-          <button class="nav-btn" data-week="dispos" data-dir="1" aria-label="Semaine suivante"></button>
-        </nav>
-        <div id="disposList" aria-live="polite"></div>
+        <div id="svcList"></div>
+      </section>
+
+      <!-- Finances -->
+      <section id="finances" hidden>
+        <div class="stats" id="finStats"></div>
+        <div class="card" style="margin-bottom:14px">
+          <h2 style="font-size:18px;margin-bottom:8px">Par semaine</h2>
+          <table id="finWeeks"></table>
+        </div>
+        <div class="card">
+          <h2 style="font-size:18px;margin-bottom:8px">Par prestation</h2>
+          <table id="finServices"></table>
+        </div>
       </section>
 
       <!-- Clientes -->
@@ -78,13 +86,39 @@
           </div>
           <div class="table-wrap"><table id="clientTable"></table></div>
         </div>
-        <div class="card" style="margin-top:14px">
-          <h2 style="font-size:18px;margin-bottom:8px">Réservations par mois</h2>
-          <table id="monthTable"></table>
-        </div>
       </section>
     </div>
   </main>
+
+  <!-- Ajouter un cours -->
+  <dialog class="sheet" id="addSheet">
+    <div class="panel">
+      <div class="grip"></div>
+      <h2>Ajouter un cours</h2>
+      <form id="add">
+        <label>Prestation <select name="service" id="svcSelect"></select></label>
+        <div class="grid2">
+          <label>Jour <input type="date" name="date" required /></label>
+          <label>Heure <input type="time" name="time" required value="09:00" step="300" /></label>
+          <label>Durée (min) <input type="number" name="duration_minutes" required value="55" min="10" max="240" /></label>
+          <label>Places <input type="number" name="capacity" required value="6" min="1" max="100" /></label>
+          <label>Tarif (€) <input type="number" name="price" min="0" max="1000" step="0.5" value="20" /></label>
+          <label>Intervenante <input name="coach" maxlength="80" /></label>
+          <label class="span2">Intitulé <input name="title" required maxlength="80" value="Pilates" /></label>
+          <label class="span2">Répéter chaque semaine jusqu'au <input type="date" name="until" />
+            <small class="muted">Laisser vide pour une seule séance. Aucune limite de date.</small></label>
+        </div>
+        <p class="error" id="addError" role="alert"></p>
+        <button class="btn btn-primary btn-block" type="submit">Ajouter à l'agenda</button>
+        <button class="btn btn-ghost btn-block" type="button" data-close style="margin-top:4px">Annuler</button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Détail d'un cours -->
+  <dialog class="sheet" id="sessionSheet">
+    <div class="panel"><div class="grip"></div><div id="sessionBody"></div></div>
+  </dialog>
 
   <!-- Export story Instagram -->
   <dialog class="sheet" id="story">

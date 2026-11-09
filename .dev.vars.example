@@ -12,3 +12,6 @@ EMAIL_FROM=Pilatelia <reservations@votre-domaine.fr>
 STUDIO_NAME=Pilatelia Studio
 STUDIO_EMAIL=studio@votre-domaine.fr
 STUDIO_PHONE=06 12 34 56 78
+
+# Instagram du studio : @pseudo ou URL. Alimente le bouton "Abonnements" côté cliente.
+STUDIO_INSTAGRAM=@pilatelia
