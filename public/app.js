@@ -17,6 +17,7 @@ $('#tabBookIc').innerHTML = ic('calendar');
 $('#tabMineIc').innerHTML = ic('checkCircle');
 $('#noteIc').innerHTML = ic('user');
 $('#doneIc').innerHTML = ic('check');
+document.querySelectorAll('.studio-access').forEach((el) => { el.innerHTML = ic('lock'); });
 
 function toast(msg) {
   const el = $('#toast');
