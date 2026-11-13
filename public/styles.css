@@ -284,7 +284,7 @@ td.num, th.num { text-align:right; }
 /* Séance déjà réservée depuis cet appareil */
 .pill.booked { background:var(--success-tint); color:var(--success); }
 .slot.booked-card { border-color:var(--success); }
-.slot.booked-card .go:disabled { background:var(--success-tint); color:var(--success); }
+.slot.booked-card .go { background:var(--success-tint); color:var(--success); }
 
 /* Accès espace studio : icône cadenas discrète, en haut à droite (réservé au studio) */
 .top-actions { align-self:flex-start; display:flex; align-items:center; gap:8px; }

@@ -103,7 +103,7 @@ function slotCard(s, isBooked) {
   else if (left <= 0) pill = '<span class="pill full">Complet</span>';
   else if (left <= 2) pill = `<span class="pill few">Plus qu'${plural(left, 'place')}</span>`;
   else pill = `<span class="pill free">${plural(left, 'place')}</span>`;
-  const disabled = isBooked || left <= 0;
+  const disabled = !isBooked && left <= 0; // une séance déjà réservée reste cliquable (→ modifier)
   return `<div class="card slot ${isBooked ? 'booked-card' : (left <= 0 ? 'full-card' : '')}">
     <div class="time"><div class="h">${fmt.time.format(start)}</div><div class="d">${s.duration_minutes} min</div></div>
     <div class="body">
@@ -111,7 +111,7 @@ function slotCard(s, isBooked) {
       ${s.coach ? `<div class="coach">avec ${esc(s.coach)}</div>` : ''}
       <div class="foot">${pill}${s.price_cents ? `<span class="price">${euro(s.price_cents)}</span>` : ''}</div>
     </div>
-    <button class="go" data-id="${s.id}" aria-label="${isBooked ? 'Déjà inscrite' : 'Réserver'}" ${disabled ? 'disabled' : ''}>${ic(isBooked ? 'check' : (left <= 0 ? 'close' : 'chevronR'))}</button>
+    <button class="go" data-id="${s.id}" aria-label="${isBooked ? 'Modifier ma réservation' : 'Réserver'}" ${disabled ? 'disabled' : ''}>${ic(isBooked ? 'edit' : (left <= 0 ? 'close' : 'chevronR'))}</button>
   </div>`;
 }
 
@@ -126,7 +126,7 @@ $('#days').addEventListener('click', (e) => {
 $('#slots').addEventListener('click', (e) => {
   const b = e.target.closest('[data-id]');
   if (!b) return;
-  if (bookedSlotIds().has(b.dataset.id)) { toast('Vous êtes déjà inscrite à ce cours.'); return; }
+  if (bookedSlotIds().has(b.dataset.id)) { switchView('mine'); return; }
   if (upcomingCount() >= 3) { toast('3 réservations maximum sur cet appareil. Annulez-en une pour réserver.'); return; }
   chosen = slots.find((s) => s.id === b.dataset.id);
   openSheet();
@@ -198,8 +198,8 @@ function contactBlock() {
   const mail = conf.studio_email ? `<a class="btn btn-primary" href="mailto:${esc(conf.studio_email)}?subject=${encodeURIComponent('Ma réservation Pilatelia')}">${ic('mail')} Écrire</a>` : '';
   const tel = conf.studio_phone ? `<a class="btn btn-secondary" href="tel:${esc(conf.studio_phone.replace(/\s/g, ''))}">${ic('phone')} Appeler</a>` : '';
   return `<div class="card">
-    <h2 style="font-size:16px;margin-bottom:4px">Besoin de changer ?</h2>
-    <p class="muted small" style="margin:0 0 14px">Tout se gère avec le studio. L'annulation reste possible à tout moment ; une modification n'est plus possible dans les 24h.</p>
+    <h2 style="font-size:16px;margin-bottom:4px">Un souci ?</h2>
+    <p class="muted small" style="margin:0 0 14px">En cas de souci, appelez le studio.</p>
     <div class="actions-2">${mail}${tel}</div>
     ${conf.studio_address ? `<div class="lock" style="color:var(--ink-muted)">${ic('info')} ${esc(conf.studio_address)}</div>` : ''}
   </div>`;
@@ -216,7 +216,7 @@ function renderMine() {
   }
   const card = (m) => {
     const d = new Date(m.slot.starts_at);
-    const limit = new Date(d.getTime() - 86400000);
+    const canModify = d.getTime() - Date.now() > 86400000; // plus de 24h avant
     return `<div class="card" style="margin-bottom:12px">
       <div class="slot" style="align-items:flex-start">
         <div class="time" style="min-width:54px"><div class="date" style="text-align:center"></div>
@@ -229,19 +229,50 @@ function renderMine() {
           <div class="name">${esc(m.slot.title)}</div>
           <div class="coach">${fmt.time.format(d)} · ${m.slot.duration_minutes} min</div>
           <span class="status">${ic('check')} Confirmée</span>
-          <div class="lock">${ic('lock')} Modifiable jusqu'au ${fmt.day.format(limit)} à ${fmt.time.format(limit)} (24h avant).</div>
         </div>
       </div>
+      ${canModify
+        ? `<div class="actions-2" style="margin-top:14px">
+            <button class="btn btn-secondary" data-move="${m.id}">${ic('repeat')} Déplacer</button>
+            <button class="btn btn-ghost" data-cancel="${m.id}">${ic('trash')} Annuler</button>
+          </div>`
+        : `<div class="lock">${ic('info')} En cas de souci, appelez le studio.</div>`}
     </div>`;
   };
   $('#mine').innerHTML = upcoming.map(card).join('')
     + contactBlock()
-    + `<div class="note" style="margin-top:12px">${ic('info')}<p>Sans compte : vos réservations sont gardées sur cet appareil, dans la limite de 3 à la fois.</p></div>`
     + (past.length ? `<p class="subh" style="margin-top:18px">Déjà passées</p>${past.map((m) => {
         const d = new Date(m.slot.starts_at);
         return `<div class="card slot full-card" style="margin-bottom:10px"><div class="time"><div class="h">${d.getDate()}/${d.getMonth() + 1}</div><div class="d">${fmt.time.format(d)}</div></div><div class="body"><div class="name">${esc(m.slot.title)}</div></div></div>`;
       }).join('')}` : '');
 }
+
+// Annulation / déplacement en autonomie (séance à plus de 24h).
+async function cancelReservation(id) {
+  try {
+    await api('/api/cancel', { method: 'POST', body: JSON.stringify({ id }) });
+    saveMyIds(myIds().filter((x) => x !== id));
+    return true;
+  } catch (err) { toast(err.message); return false; }
+}
+
+$('#mine').addEventListener('click', async (e) => {
+  const cancelBtn = e.target.closest('[data-cancel]');
+  const moveBtn = e.target.closest('[data-move]');
+  const btn = cancelBtn || moveBtn;
+  if (!btn) return;
+  const moving = !!moveBtn;
+  const msg = moving
+    ? 'Pour déplacer, votre place actuelle sera annulée afin d’en choisir une autre. Continuer ?'
+    : 'Annuler cette séance ? Votre place sera libérée.';
+  if (!confirm(msg)) return;
+  btn.disabled = true;
+  const ok = await cancelReservation(btn.dataset.cancel || btn.dataset.move);
+  if (!ok) { btn.disabled = false; return; }
+  await Promise.all([loadMine(), loadWeek()]);
+  if (moving) { switchView('book'); toast('Choisissez votre nouveau créneau.'); }
+  else toast('Séance annulée.');
+});
 
 // ---------- Navigation ----------
 
