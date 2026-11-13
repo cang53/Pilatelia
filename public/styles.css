@@ -274,41 +274,11 @@ td.num, th.num { text-align:right; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 .admin .toast { bottom:calc(24px + env(safe-area-inset-bottom)); }
 
-/* ---------- Identité Pilatelia (logo, arche & laurier) ---------- */
+/* Logo du studio (discret) */
 .brandmark { border-radius:50%; object-fit:cover; background:var(--surface-100);
   border:1px solid var(--border); box-shadow:var(--shadow-sm); flex:0 0 auto; }
-
-/* Hero cliente : arche sauge + logo, dans l'esprit des stories du studio */
-.hero { position:relative; text-align:center; margin:2px 0 20px;
-  padding:26px 20px 22px; border-radius:150px 150px var(--radius-xl) var(--radius-xl);
-  background:
-    radial-gradient(120% 82% at 50% -8%, rgba(179,138,66,.20), transparent 62%),
-    linear-gradient(168deg, var(--sage-tint) 0%, var(--surface-100) 70%);
-  border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden; }
-.hero .brandmark { width:74px; height:74px; position:relative; z-index:1; }
-.hero .kicker { margin-top:13px; color:var(--sage-strong); }
-.hero .title { margin-top:3px; }
-.hero .tagline { font-family:var(--serif); font-style:italic; font-size:14px;
-  color:var(--ink-muted); margin-top:6px; }
-.hero .count { position:absolute; top:16px; right:16px; z-index:2; }
-/* Brins de laurier qui encadrent le logo (rappel du monogramme) */
-.hero .laurel { position:absolute; top:22px; width:40px; height:74px; color:var(--sage);
-  opacity:.55; z-index:0; }
-.hero .laurel.l { left:calc(50% - 74px); transform:scaleX(-1); }
-.hero .laurel.r { right:calc(50% - 74px); }
-@media (max-width:360px){ .hero .laurel { display:none; } }
-
-/* Lockup logo + titre (vue « Ma réservation ») */
-.brand-inline { display:flex; align-items:center; gap:12px; min-width:0; }
-.brand-inline .brandmark { width:44px; height:44px; }
-
-/* Barre d'identité (admin) */
-.brandbar { display:flex; align-items:center; gap:12px; padding:4px 2px 16px; }
-.brandbar .brandmark { width:46px; height:46px; }
-.brandbar .wm { font-family:var(--serif); font-weight:600; font-size:20px; letter-spacing:.14em;
-  color:var(--brand); line-height:1; }
-.brandbar .wm small { display:block; font-family:var(--sans); font-weight:600; font-size:9.5px;
-  letter-spacing:.28em; text-transform:uppercase; color:var(--ink-faint); margin-top:4px; }
-.login .brandmark { width:68px; height:68px; display:block; margin:0 auto 14px; }
+.topbar .brandmark { width:40px; height:40px; }
+.topbar .brand-inline { display:flex; align-items:center; gap:11px; min-width:0; }
+.login .brandmark { width:64px; height:64px; display:block; margin:0 auto 14px; }
 
 [hidden] { display:none !important; }

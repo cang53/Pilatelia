@@ -15,15 +15,16 @@
   <main class="app">
     <!-- Vue : Réserver -->
     <section id="view-book">
-      <header class="hero">
+      <div class="topbar">
+        <div class="brand-inline">
+          <img class="brandmark" src="logo.jpg" width="40" height="40" alt="Pilatelia" />
+          <div>
+            <div class="kicker" id="monthLabel">Pilatelia</div>
+            <h1 class="title">Réserver une séance</h1>
+          </div>
+        </div>
         <span class="count" id="count1" hidden></span>
-        <svg class="laurel l" viewBox="0 0 40 80" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 78C20 60 24 40 20 14"/></g><g fill="currentColor"><ellipse cx="22" cy="20" rx="6" ry="2.6" transform="rotate(-32 22 20)"/><ellipse cx="12" cy="30" rx="6" ry="2.6" transform="rotate(32 12 30)"/><ellipse cx="24" cy="34" rx="6" ry="2.6" transform="rotate(-28 24 34)"/><ellipse cx="11" cy="46" rx="6" ry="2.6" transform="rotate(34 11 46)"/><ellipse cx="22" cy="50" rx="6" ry="2.6" transform="rotate(-26 22 50)"/><ellipse cx="10" cy="62" rx="5.5" ry="2.4" transform="rotate(36 10 62)"/><circle cx="20" cy="11" r="2.4"/></g></svg>
-        <svg class="laurel r" viewBox="0 0 40 80" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 78C20 60 24 40 20 14"/></g><g fill="currentColor"><ellipse cx="22" cy="20" rx="6" ry="2.6" transform="rotate(-32 22 20)"/><ellipse cx="12" cy="30" rx="6" ry="2.6" transform="rotate(32 12 30)"/><ellipse cx="24" cy="34" rx="6" ry="2.6" transform="rotate(-28 24 34)"/><ellipse cx="11" cy="46" rx="6" ry="2.6" transform="rotate(34 11 46)"/><ellipse cx="22" cy="50" rx="6" ry="2.6" transform="rotate(-26 22 50)"/><ellipse cx="10" cy="62" rx="5.5" ry="2.4" transform="rotate(36 10 62)"/><circle cx="20" cy="11" r="2.4"/></g></svg>
-        <img class="brandmark" src="logo.jpg" width="74" height="74" alt="Pilatelia — Pilates Reformer Studio" />
-        <div class="kicker" id="monthLabel">Pilatelia</div>
-        <h1 class="title">Réserver une séance</h1>
-        <p class="tagline">Et si tu poussais la bonne porte ?</p>
-      </header>
+      </div>
       <nav class="week" aria-label="Semaine">
         <button class="nav-btn" id="prev" aria-label="Semaine précédente"></button>
         <span class="label" id="weekLabel" aria-live="polite"></span>
@@ -36,10 +37,7 @@
     <!-- Vue : Ma réservation -->
     <section id="view-mine" hidden>
       <div class="topbar">
-        <div class="brand-inline">
-          <img class="brandmark" src="logo.jpg" width="44" height="44" alt="Pilatelia" />
-          <h1 class="title">Ma réservation</h1>
-        </div>
+        <h1 class="title">Ma réservation</h1>
         <span class="count" id="count2" hidden></span>
       </div>
       <div id="mine" aria-live="polite"></div>
