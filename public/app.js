@@ -101,7 +101,7 @@ function slotCard(s, isBooked) {
   let pill;
   if (isBooked) pill = `<span class="pill booked">${ic('check')} Déjà inscrite</span>`;
   else if (left <= 0) pill = '<span class="pill full">Complet</span>';
-  else if (left <= 2) pill = `<span class="pill few">Plus qu'${plural(left, 'place')}</span>`;
+  else if (left <= 2) pill = `<span class="pill few">Plus que ${plural(left, 'place')}</span>`;
   else pill = `<span class="pill free">${plural(left, 'place')}</span>`;
   const disabled = !isBooked && left <= 0; // une séance déjà réservée reste cliquable (→ modifier)
   return `<div class="card slot ${isBooked ? 'booked-card' : (left <= 0 ? 'full-card' : '')}">
