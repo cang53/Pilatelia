@@ -152,7 +152,7 @@ const slotLine = (slot) =>
 
 const changeNote = (s) => {
   const how = [s.email && `par e-mail (${esc(s.email)})`, s.phone && `par téléphone (${esc(s.phone)})`].filter(Boolean).join(' ou ');
-  return `<p style="color:#7b6b56">Pour modifier ou annuler, contactez le studio${how ? ` ${how}` : ''}. Une modification n'est plus possible dans les 24h avant la séance ; l'annulation reste possible à tout moment.</p>`;
+  return `<p style="color:#7b6b56">Vous pouvez modifier ou annuler votre séance depuis l'application jusqu'à 24h avant. En cas de souci, appelez le studio${how ? ` ${how}` : ''}.</p>`;
 };
 
 function confirmationEmail(s, slot, origin) {
@@ -228,6 +228,23 @@ async function myBookings(request, env) {
     .map((r) => ({ id: r.id, name: r.guest_name, email: r.guest_email, slot: r.classes }))
     .sort((a, b) => new Date(a.slot.starts_at) - new Date(b.slot.starts_at));
   return json(out);
+}
+
+// Annulation / déplacement en autonomie depuis l'appareil : autorisé seulement
+// à plus de 24h de la séance. En deçà, il faut passer par le studio.
+async function cancelBooking(request, env, ctx) {
+  const { id } = await request.json().catch(() => ({}));
+  if (!UUID.test(id || '')) return json({ error: 'Identifiant invalide.' }, 400);
+  const rows = await db(env, `bookings?select=id,guest_name,guest_email,classes(id,title,starts_at,duration_minutes)&id=eq.${id}`);
+  const booking = rows[0];
+  if (!booking) return json({ error: 'Réservation introuvable.' }, 404);
+  const slot = booking.classes;
+  if (slot && new Date(slot.starts_at).getTime() - Date.now() < DAY) {
+    return json({ error: 'Modification possible en ligne jusqu’à 24h avant la séance. En cas de souci, appelez le studio.' }, 409);
+  }
+  await db(env, `bookings?id=eq.${id}`, { method: 'DELETE' });
+  if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: booking.guest_email, ...cancellationEmail(s, slot) }); })());
+  return json({ ok: true });
 }
 
 // ---------- Admin ----------
@@ -479,6 +496,7 @@ export default {
       if (url.pathname === '/api/slots' && request.method === 'GET') return await publicSlots(url, env);
       if (url.pathname === '/api/book' && request.method === 'POST') return await book(request, env, ctx);
       if (url.pathname === '/api/my' && request.method === 'POST') return await myBookings(request, env);
+      if (url.pathname === '/api/cancel' && request.method === 'POST') return await cancelBooking(request, env, ctx);
       if (url.pathname.startsWith('/api/admin/')) return await admin(request, url, env, ctx);
       if (url.pathname.startsWith('/api/')) return json({ error: 'Introuvable.' }, 404);
     } catch (err) {
