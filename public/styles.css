@@ -13,8 +13,17 @@
   --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Fraunces","Iowan Old Style",Georgia,serif;
 }
-/* Thème clair uniquement (dark mode désactivé). */
-:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-50:#1b140e; --surface-100:#271e15; --surface-200:#332618;
+    --border:#413019; --ink:#f3e8d8; --ink-muted:#bfa98f; --ink-faint:#9a876e;
+    --brand:#cba173; --brand-strong:#dcb78c; --brand-tint:#3a2a19; --on-brand:#1b140e;
+    --sage:#a1b58e; --sage-strong:#b4c7a1; --sage-tint:#28311e; --gold:#d8b16a;
+    --success:#8fb27a; --success-tint:#232e1b; --warning:#e0a95a;
+    --danger:#dd8c72; --danger-tint:#3a221a; --overlay:rgba(0,0,0,.64);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.5); --shadow-md:0 6px 18px rgba(0,0,0,.55); --shadow-lg:0 16px 40px rgba(0,0,0,.6);
+  }
+}
 
 * { box-sizing:border-box; }
 html, body { margin:0; }

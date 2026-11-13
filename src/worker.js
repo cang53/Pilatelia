@@ -109,13 +109,6 @@ function calendarButtons(s, slot, origin) {
 }
 
 // Envoi via Resend si configuré (RESEND_API_KEY + EMAIL_FROM), sinon no-op tracé.
-// Version texte brut (améliore la délivrabilité : e-mail multipart, moins de spam).
-const htmlToText = (html) => String(html)
-  .replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<br\s*\/?>(?=)/gi, '\n')
-  .replace(/<\/(p|div|tr|h\d)>/gi, '\n').replace(/<[^>]+>/g, ' ')
-  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#\d+;/g, ' ')
-  .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').replace(/^\s+|\s+$/g, '');
-
 async function sendEmail(env, { to, subject, html }) {
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     console.log(`[email non configuré] à ${to} : ${subject}`);
@@ -124,7 +117,7 @@ async function sendEmail(env, { to, subject, html }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from: env.EMAIL_FROM, to: [to], subject, html, text: htmlToText(html) }),
+    body: JSON.stringify({ from: env.EMAIL_FROM, to: [to], subject, html }),
   });
   if (!res.ok) console.error(`[email échec ${res.status}] ${await res.text()}`);
 }
