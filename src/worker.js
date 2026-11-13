@@ -58,6 +58,56 @@ async function loadStudio(env) {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtDate = (iso) => new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).format(new Date(iso));
 
+// ---------- Ajouter à un agenda (Google / Apple / iCal) ----------
+// Horodatage iCalendar en UTC : 20261116T170000Z
+const icsStamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+const icsEsc = (v) => String(v ?? '').replace(/([,;\\])/g, '\\$1').replace(/\r?\n/g, '\\n');
+
+// Construit un fichier .ics à partir des paramètres d'URL (sans accès base).
+function buildIcs(params) {
+  const start = new Date(params.get('s'));
+  if (isNaN(start)) throw new HttpError(400, 'Date invalide.');
+  const dur = Math.min(600, Math.max(5, parseInt(params.get('d') || '55', 10) || 55));
+  const end = new Date(start.getTime() + dur * 60000);
+  const name = (params.get('n') || 'Pilatelia').slice(0, 120);
+  const title = (params.get('t') || 'Pilates').slice(0, 200);
+  const loc = (params.get('l') || '').slice(0, 300);
+  const uid = `${icsStamp(start)}-${Math.random().toString(36).slice(2, 10)}@pilatelia`;
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pilatelia//Reservation//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${icsStamp(new Date())}`, `DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`,
+    `SUMMARY:${icsEsc(`${title} — ${name}`)}`,
+    loc ? `LOCATION:${icsEsc(loc)}` : null,
+    `DESCRIPTION:${icsEsc(`Séance réservée via ${name}.`)}`,
+    'BEGIN:VALARM', 'TRIGGER:-PT2H', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(`Rappel — ${title}`)}`, 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].filter(Boolean);
+  return lines.join('\r\n');
+}
+
+// Deux boutons « ajouter à l'agenda » pour l'e-mail (Google + Apple/iCal via .ics).
+function calendarButtons(s, slot, origin) {
+  if (!origin) return '';
+  const start = new Date(slot.starts_at);
+  const dur = slot.duration_minutes || 55;
+  const end = new Date(start.getTime() + dur * 60000);
+  const gp = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${slot.title || 'Pilates'} — ${s.name || 'Pilatelia'}`,
+    dates: `${icsStamp(start)}/${icsStamp(end)}`,
+    details: `Séance réservée via ${s.name || 'Pilatelia'}.`,
+  });
+  if (s.address) gp.set('location', s.address);
+  const gcal = `https://calendar.google.com/calendar/render?${gp.toString()}`;
+  const ics = `${origin}/api/ics?${new URLSearchParams({ t: slot.title || 'Pilates', s: slot.starts_at, d: String(dur), l: s.address || '', n: s.name || 'Pilatelia' }).toString()}`;
+  const base = 'display:inline-block;text-decoration:none;font-weight:700;font-size:14px;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0';
+  return `<div style="margin:14px 0">
+    <div style="font-size:13px;color:#7b6b56;margin-bottom:9px">Ajouter la séance à votre agenda</div>
+    <a href="${esc(gcal)}" style="${base};background:#6e4d32;color:#fdf7ec">📅 Google Agenda</a>
+    <a href="${esc(ics)}" style="${base};background:#ffffff;color:#6e4d32;border:1px solid #e1d4bf">🍎 Apple Calendar</a>
+  </div>`;
+}
+
 // Envoi via Resend si configuré (RESEND_API_KEY + EMAIL_FROM), sinon no-op tracé.
 async function sendEmail(env, { to, subject, html }) {
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
@@ -105,9 +155,9 @@ const changeNote = (s) => {
   return `<p style="color:#7b6b56">Pour modifier ou annuler, contactez le studio${how ? ` ${how}` : ''}. Une modification n'est plus possible dans les 24h avant la séance ; l'annulation reste possible à tout moment.</p>`;
 };
 
-function confirmationEmail(s, slot) {
+function confirmationEmail(s, slot, origin) {
   return { subject: `C'est réservé — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
-    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${venueLine(s)}${changeNote(s)}`) };
+    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${calendarButtons(s, slot, origin)}${venueLine(s)}${changeNote(s)}`) };
 }
 function cancellationEmail(s, slot) {
   return { subject: `Réservation annulée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
@@ -153,7 +203,8 @@ async function book(request, env, ctx) {
     const row = Array.isArray(result) ? result[0] : result;
     // Détails de la séance pour l'e-mail + le reçu renvoyé à l'appareil.
     const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes&id=eq.${slot_id}`);
-    if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot) }); })());
+    const origin = new URL(request.url).origin;
+    if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot, origin) }); })());
     return json({ ok: true, id: row?.id, slot }, 201);
   } catch (err) {
     const d = err.detail || '';
@@ -417,6 +468,13 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
+      if (url.pathname === '/api/ics' && request.method === 'GET') {
+        return new Response(buildIcs(url.searchParams), { headers: {
+          'content-type': 'text/calendar; charset=utf-8',
+          'content-disposition': 'attachment; filename="pilatelia.ics"',
+          'cache-control': 'no-store',
+        } });
+      }
       if (url.pathname === '/api/config' && request.method === 'GET') return await config(env);
       if (url.pathname === '/api/slots' && request.method === 'GET') return await publicSlots(url, env);
       if (url.pathname === '/api/book' && request.method === 'POST') return await book(request, env, ctx);

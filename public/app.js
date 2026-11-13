@@ -81,30 +81,36 @@ function subscribeCard() {
   </a>`;
 }
 
+// Ids des séances où cet appareil est déjà inscrit (pas de double réservation).
+const bookedSlotIds = () => new Set(mine.map((m) => m.slot && m.slot.id).filter(Boolean));
+
 function renderSlots() {
   const items = slots.filter((s) => ymd(new Date(s.starts_at)) === selectedDay);
   const d = new Date(`${selectedDay}T12:00`);
+  const booked = bookedSlotIds();
   const body = items.length
-    ? `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p><div class="list">${items.map(slotCard).join('')}</div>`
+    ? `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p><div class="list">${items.map((s) => slotCard(s, booked.has(s.id))).join('')}</div>`
     : `<p class="subh">${fmt.day.format(d)}</p><p class="empty">Aucune séance ce jour-là.<br>Choisissez un autre jour.</p>`;
   $('#slots').innerHTML = body + subscribeCard();
 }
 
-function slotCard(s) {
+function slotCard(s, isBooked) {
   const left = s.capacity - s.booked;
   const start = new Date(s.starts_at);
   let pill;
-  if (left <= 0) pill = '<span class="pill full">Complet</span>';
+  if (isBooked) pill = `<span class="pill booked">${ic('check')} Déjà inscrite</span>`;
+  else if (left <= 0) pill = '<span class="pill full">Complet</span>';
   else if (left <= 2) pill = `<span class="pill few">Plus qu'${plural(left, 'place')}</span>`;
   else pill = `<span class="pill free">${plural(left, 'place')}</span>`;
-  return `<div class="card slot ${left <= 0 ? 'full-card' : ''}">
+  const disabled = isBooked || left <= 0;
+  return `<div class="card slot ${isBooked ? 'booked-card' : (left <= 0 ? 'full-card' : '')}">
     <div class="time"><div class="h">${fmt.time.format(start)}</div><div class="d">${s.duration_minutes} min</div></div>
     <div class="body">
       <div class="name">${esc(s.title)}</div>
       ${s.coach ? `<div class="coach">avec ${esc(s.coach)}</div>` : ''}
       <div class="foot">${pill}${s.price_cents ? `<span class="price">${euro(s.price_cents)}</span>` : ''}</div>
     </div>
-    <button class="go" data-id="${s.id}" aria-label="Réserver" ${left <= 0 ? 'disabled' : ''}>${ic(left <= 0 ? 'close' : 'chevronR')}</button>
+    <button class="go" data-id="${s.id}" aria-label="${isBooked ? 'Déjà inscrite' : 'Réserver'}" ${disabled ? 'disabled' : ''}>${ic(isBooked ? 'check' : (left <= 0 ? 'close' : 'chevronR'))}</button>
   </div>`;
 }
 
@@ -119,6 +125,7 @@ $('#days').addEventListener('click', (e) => {
 $('#slots').addEventListener('click', (e) => {
   const b = e.target.closest('[data-id]');
   if (!b) return;
+  if (bookedSlotIds().has(b.dataset.id)) { toast('Vous êtes déjà inscrite à ce cours.'); return; }
   if (upcomingCount() >= 3) { toast('3 réservations maximum sur cet appareil. Annulez-en une pour réserver.'); return; }
   chosen = slots.find((s) => s.id === b.dataset.id);
   openSheet();
@@ -183,6 +190,7 @@ async function loadMine() {
   } catch { /* garde l'état précédent */ }
   renderMine();
   renderCount();
+  if (slots.length) renderSlots(); // rafraîchit les marqueurs « déjà inscrite »
 }
 
 function contactBlock() {

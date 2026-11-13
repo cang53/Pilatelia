@@ -281,4 +281,27 @@ td.num, th.num { text-align:right; }
 .topbar .brand-inline { display:flex; align-items:center; gap:11px; min-width:0; }
 .login .brandmark { width:64px; height:64px; display:block; margin:0 auto 14px; }
 
+/* Séance déjà réservée depuis cet appareil */
+.pill.booked { background:var(--success-tint); color:var(--success); }
+.slot.booked-card { border-color:var(--success); }
+.slot.booked-card .go:disabled { background:var(--success-tint); color:var(--success); }
+
+/* Accès espace studio (lien discret en bas de la page cliente) */
+.studio-link-wrap { text-align:center; padding:12px 0 2px; }
+.studio-link { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+  color:var(--ink-muted); text-decoration:none; padding:9px 16px; border-radius:var(--radius-pill);
+  border:1px solid var(--border); background:var(--surface-100); box-shadow:var(--shadow-sm); }
+.studio-link:hover { color:var(--brand); border-color:var(--brand); }
+
+/* ---------- Espace studio en vue ordinateur ---------- */
+@media (min-width:860px) {
+  .app.admin { max-width:1040px; padding-left:28px; padding-right:28px; }
+  .app.admin .seg { max-width:720px; margin-left:auto; margin-right:auto; }
+  .admin .stats { grid-template-columns:repeat(4, 1fr); }
+  .admin .seg button { font-size:17px; }
+  .admin .title { font-size:28px; }
+  /* La grille d'agenda tient alors sans défilement horizontal. */
+  .timetable { min-width:100%; }
+}
+
 [hidden] { display:none !important; }
