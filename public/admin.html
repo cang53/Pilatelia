@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex" />
-  <meta name="theme-color" content="#faf6f1" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#17130f" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4ebdf" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1b140e" media="(prefers-color-scheme: dark)" />
   <title>Pilatelia — Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,14 +16,19 @@
   <main class="app admin">
     <!-- Connexion -->
     <form id="login" class="card login">
-      <div class="kicker">Espace studio</div>
-      <h1 class="title" style="margin:4px 0 16px">Connexion</h1>
+      <img class="brandmark" src="logo.jpg" width="68" height="68" alt="Pilatelia — Pilates Reformer Studio" />
+      <div class="kicker center">Espace studio</div>
+      <h1 class="title center" style="margin:4px 0 18px">Connexion</h1>
       <label>Mot de passe <input type="password" name="password" autocomplete="current-password" required /></label>
       <p class="error" id="loginError" role="alert"></p>
       <button class="btn btn-primary btn-block">Entrer</button>
     </form>
 
     <div id="app" hidden>
+      <div class="brandbar">
+        <img class="brandmark" src="logo.jpg" width="46" height="46" alt="Pilatelia" />
+        <div class="wm">PILATELIA<small>Pilates Reformer Studio</small></div>
+      </div>
       <div class="seg scroll" role="tablist">
         <button class="on" data-tab="agenda">Agenda</button>
         <button data-tab="prestations">Prestations</button>

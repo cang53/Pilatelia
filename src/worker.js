@@ -73,17 +73,17 @@ async function sendEmail(env, { to, subject, html }) {
 }
 
 function emailShell(s, title, bodyHtml) {
-  const contact = [s.email && `<a href="mailto:${esc(s.email)}" style="color:#8f4a63">${esc(s.email)}</a>`, s.phone && esc(s.phone)]
+  const contact = [s.email && `<a href="mailto:${esc(s.email)}" style="color:#6e4d32">${esc(s.email)}</a>`, s.phone && esc(s.phone)]
     .filter(Boolean).join(' · ');
-  return `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;background:#faf6f1;padding:24px 0;color:#2c2420">
-    <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e7dccf;border-radius:22px;overflow:hidden">
-      <div style="background:#f6e7ec;padding:22px 26px">
-        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#8f4a63;font-weight:700">${esc(s.name || 'Pilatelia')}</div>
+  return `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;background:#f4ebdf;padding:24px 0;color:#3a2e22">
+    <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e1d4bf;border-radius:22px;overflow:hidden">
+      <div style="background:#ebdfcd;padding:22px 26px">
+        <div style="font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#6e4d32;font-weight:700">${esc(s.name || 'Pilatelia')}</div>
         <div style="font-size:22px;font-weight:700;margin-top:6px">${esc(title)}</div>
       </div>
       <div style="padding:24px 26px;font-size:15px;line-height:22px">${bodyHtml}</div>
-      <div style="padding:16px 26px;background:#f3ebe2;font-size:13px;color:#6f645b">
-        <div style="font-weight:700;color:#2c2420">${esc(s.name)}</div>
+      <div style="padding:16px 26px;background:#ece0cf;font-size:13px;color:#7b6b56">
+        <div style="font-weight:700;color:#3a2e22">${esc(s.name)}</div>
         ${s.address ? `<div style="margin-top:3px">${esc(s.address)}</div>` : ''}
         ${contact ? `<div style="margin-top:3px">${contact}</div>` : ''}
       </div>
@@ -91,18 +91,18 @@ function emailShell(s, title, bodyHtml) {
   </div>`;
 }
 const venueLine = (s) => s.address
-  ? `<div style="background:#e8efe6;border-radius:16px;padding:14px 16px;margin:14px 0;font-size:14px"><b>Adresse</b><br>${esc(s.address)}</div>`
+  ? `<div style="background:#e6ecd9;border-radius:16px;padding:14px 16px;margin:14px 0;font-size:14px"><b>Adresse</b><br>${esc(s.address)}</div>`
   : '';
 
 const slotLine = (slot) =>
-  `<div style="background:#f6e7ec;border-radius:16px;padding:16px;margin:14px 0">
+  `<div style="background:#ebdfcd;border-radius:16px;padding:16px;margin:14px 0">
     <div style="font-size:17px;font-weight:700">${esc(slot.title || 'Pilates')}</div>
-    <div style="color:#6f645b;margin-top:4px">${esc(fmtDate(slot.starts_at))} · ${slot.duration_minutes} min</div>
+    <div style="color:#7b6b56;margin-top:4px">${esc(fmtDate(slot.starts_at))} · ${slot.duration_minutes} min</div>
   </div>`;
 
 const changeNote = (s) => {
   const how = [s.email && `par e-mail (${esc(s.email)})`, s.phone && `par téléphone (${esc(s.phone)})`].filter(Boolean).join(' ou ');
-  return `<p style="color:#6f645b">Pour modifier ou annuler, contactez le studio${how ? ` ${how}` : ''}. Une modification n'est plus possible dans les 24h avant la séance ; l'annulation reste possible à tout moment.</p>`;
+  return `<p style="color:#7b6b56">Pour modifier ou annuler, contactez le studio${how ? ` ${how}` : ''}. Une modification n'est plus possible dans les 24h avant la séance ; l'annulation reste possible à tout moment.</p>`;
 };
 
 function confirmationEmail(s, slot) {

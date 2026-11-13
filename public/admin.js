@@ -327,7 +327,7 @@ $('#csv').addEventListener('click', () => {
 
 // ---------- Export story (canvas 1080 x 1920) ----------
 
-const STORY = { bg: '#faf6f1', band: '#f6e7ec', ink: '#2c2420', muted: '#6f645b', brand: '#8f4a63', brandStrong: '#78384f', sage: '#6f8a72', sageTint: '#e8efe6' };
+const STORY = { bg: '#f4ebdf', band: '#e6ecd9', ink: '#3a2e22', muted: '#7b6b56', brand: '#6e4d32', brandStrong: '#583c26', sage: '#788e68', sageTint: '#e6ecd9' };
 
 async function drawStory() {
   const g = $('#storyCanvas').getContext('2d');

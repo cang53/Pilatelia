@@ -1,26 +1,26 @@
-/* Pilatelia — design system (bois de rose + sauge, mobile first). */
+/* Pilatelia — design system (terre, sauge & bois, d'après la DA du studio). Mobile first. */
 :root {
-  --surface-50:#faf6f1; --surface-100:#ffffff; --surface-200:#f3ebe2;
-  --border:#e7dccf; --ink:#2c2420; --ink-muted:#6f645b; --ink-faint:#9c9085;
-  --brand:#8f4a63; --brand-strong:#78384f; --brand-tint:#f6e7ec; --on-brand:#ffffff;
-  --sage:#6f8a72; --sage-tint:#e8efe6; --gold:#9c7533;
-  --success:#3f7a54; --success-tint:#e4f0e6; --warning:#9a6a24;
-  --danger:#a8463f; --danger-tint:#f7e4e2; --overlay:rgba(44,36,32,.45);
-  --shadow-sm:0 1px 2px rgba(44,36,32,.06);
-  --shadow-md:0 6px 18px rgba(44,36,32,.10);
-  --shadow-lg:0 16px 40px rgba(44,36,32,.16);
+  --surface-50:#f4ebdf; --surface-100:#fdf9f2; --surface-200:#ece0cf;
+  --border:#e1d4bf; --ink:#3a2e22; --ink-muted:#7b6b56; --ink-faint:#a69579;
+  --brand:#6e4d32; --brand-strong:#583c26; --brand-tint:#ebdfcd; --on-brand:#fdf7ec;
+  --sage:#788e68; --sage-strong:#5f7351; --sage-tint:#e6ecd9; --gold:#b38a42;
+  --success:#5c7a4e; --success-tint:#e5ecd9; --warning:#9a6a24;
+  --danger:#ab5339; --danger-tint:#f4e1d7; --overlay:rgba(58,46,34,.46);
+  --shadow-sm:0 1px 2px rgba(58,46,34,.07);
+  --shadow-md:0 6px 18px rgba(58,46,34,.12);
+  --shadow-lg:0 16px 40px rgba(58,46,34,.18);
   --radius-sm:10px; --radius-md:16px; --radius-lg:22px; --radius-xl:32px; --radius-pill:999px;
   --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Fraunces","Iowan Old Style",Georgia,serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface-50:#17130f; --surface-100:#221d18; --surface-200:#2c2620;
-    --border:#3a332b; --ink:#f4ece2; --ink-muted:#b7a99c; --ink-faint:#978a7c;
-    --brand:#cf829a; --brand-strong:#dd96ad; --brand-tint:#3a2730; --on-brand:#221014;
-    --sage:#91ab93; --sage-tint:#26302a; --gold:#d4ab6b;
-    --success:#7bb98d; --success-tint:#1f2e24; --warning:#e0a95a;
-    --danger:#e08a84; --danger-tint:#3a211f; --overlay:rgba(0,0,0,.62);
+    --surface-50:#1b140e; --surface-100:#271e15; --surface-200:#332618;
+    --border:#413019; --ink:#f3e8d8; --ink-muted:#bfa98f; --ink-faint:#9a876e;
+    --brand:#cba173; --brand-strong:#dcb78c; --brand-tint:#3a2a19; --on-brand:#1b140e;
+    --sage:#a1b58e; --sage-strong:#b4c7a1; --sage-tint:#28311e; --gold:#d8b16a;
+    --success:#8fb27a; --success-tint:#232e1b; --warning:#e0a95a;
+    --danger:#dd8c72; --danger-tint:#3a221a; --overlay:rgba(0,0,0,.64);
     --shadow-sm:0 1px 2px rgba(0,0,0,.5); --shadow-md:0 6px 18px rgba(0,0,0,.55); --shadow-lg:0 16px 40px rgba(0,0,0,.6);
   }
 }
@@ -273,5 +273,42 @@ td.num, th.num { text-align:right; }
   box-shadow:var(--shadow-lg); opacity:0; pointer-events:none; transition:.25s; max-width:90%; z-index:50; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 .admin .toast { bottom:calc(24px + env(safe-area-inset-bottom)); }
+
+/* ---------- Identité Pilatelia (logo, arche & laurier) ---------- */
+.brandmark { border-radius:50%; object-fit:cover; background:var(--surface-100);
+  border:1px solid var(--border); box-shadow:var(--shadow-sm); flex:0 0 auto; }
+
+/* Hero cliente : arche sauge + logo, dans l'esprit des stories du studio */
+.hero { position:relative; text-align:center; margin:2px 0 20px;
+  padding:26px 20px 22px; border-radius:150px 150px var(--radius-xl) var(--radius-xl);
+  background:
+    radial-gradient(120% 82% at 50% -8%, rgba(179,138,66,.20), transparent 62%),
+    linear-gradient(168deg, var(--sage-tint) 0%, var(--surface-100) 70%);
+  border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden; }
+.hero .brandmark { width:74px; height:74px; position:relative; z-index:1; }
+.hero .kicker { margin-top:13px; color:var(--sage-strong); }
+.hero .title { margin-top:3px; }
+.hero .tagline { font-family:var(--serif); font-style:italic; font-size:14px;
+  color:var(--ink-muted); margin-top:6px; }
+.hero .count { position:absolute; top:16px; right:16px; z-index:2; }
+/* Brins de laurier qui encadrent le logo (rappel du monogramme) */
+.hero .laurel { position:absolute; top:22px; width:40px; height:74px; color:var(--sage);
+  opacity:.55; z-index:0; }
+.hero .laurel.l { left:calc(50% - 74px); transform:scaleX(-1); }
+.hero .laurel.r { right:calc(50% - 74px); }
+@media (max-width:360px){ .hero .laurel { display:none; } }
+
+/* Lockup logo + titre (vue « Ma réservation ») */
+.brand-inline { display:flex; align-items:center; gap:12px; min-width:0; }
+.brand-inline .brandmark { width:44px; height:44px; }
+
+/* Barre d'identité (admin) */
+.brandbar { display:flex; align-items:center; gap:12px; padding:4px 2px 16px; }
+.brandbar .brandmark { width:46px; height:46px; }
+.brandbar .wm { font-family:var(--serif); font-weight:600; font-size:20px; letter-spacing:.14em;
+  color:var(--brand); line-height:1; }
+.brandbar .wm small { display:block; font-family:var(--sans); font-weight:600; font-size:9.5px;
+  letter-spacing:.28em; text-transform:uppercase; color:var(--ink-faint); margin-top:4px; }
+.login .brandmark { width:68px; height:68px; display:block; margin:0 auto 14px; }
 
 [hidden] { display:none !important; }
