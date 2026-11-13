@@ -352,8 +352,10 @@ async function drawStory() {
     g.fillStyle = STORY.brandStrong; g.font = '700 30px Figtree';
     g.fillText(fmt.day.format(d).split(' ').slice(0, 2).join(' ').toUpperCase(), 82, y); y += 50;
     for (const s of items) {
-      g.fillStyle = STORY.ink; g.font = '600 40px Figtree'; g.fillText(fmt.time.format(new Date(s.starts_at)), 82, y);
-      g.fillStyle = STORY.muted; g.font = '500 40px Figtree'; g.fillText(s.title, 250, y); y += 58;
+      const st = new Date(s.starts_at);
+      const en = new Date(st.getTime() + (s.duration_minutes || 55) * 60000);
+      g.fillStyle = STORY.ink; g.font = '600 40px Figtree'; g.fillText(`${fmt.time.format(st)} – ${fmt.time.format(en)}`, 82, y);
+      g.fillStyle = STORY.muted; g.font = '500 40px Figtree'; g.fillText(s.title, 420, y); y += 58;
     }
     y += 26; if (y > 1680) break;
   }

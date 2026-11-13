@@ -175,7 +175,8 @@ function showDone() {
       <div class="muted small">${fmt.time.format(d)} · ${s.duration_minutes} min${s.coach ? ` · avec ${esc(s.coach)}` : ''}</div></div>
     </div>
     ${conf.studio_address ? `<div class="perf" style="background:var(--sage-tint)">${ic('info')}<p><strong>Adresse</strong><br>${esc(conf.studio_address)}</p></div>` : ''}
-    <div class="perf">${ic('mail')}<p>Un <strong>e-mail de confirmation</strong> vient de partir. Rappel la veille. Pour changer, répondez à cet e-mail ou appelez le studio.</p></div>`;
+    <div class="perf">${ic('mail')}<p>Un <strong>e-mail de confirmation</strong> vient de partir. Rappel la veille.</p></div>
+    <div class="perf" style="background:var(--surface-200)">${ic('info')}<p><strong>Pensez à vérifier vos spams</strong> (courriers indésirables) si vous ne voyez pas l'e-mail, et ajoutez-nous à vos contacts pour le recevoir à l'avenir.</p></div>`;
   $('#bookStep').hidden = true;
   $('#doneStep').hidden = false;
 }
@@ -296,8 +297,18 @@ $('#prev').addEventListener('click', () => { week = addDays(week, -7); selectedD
 $('#next').addEventListener('click', () => { week = addDays(week, 7); selectedDay = null; loadWeek(); });
 
 // ---------- Démarrage ----------
-// Par défaut, on ouvre sur la semaine courante avec le jour d'aujourd'hui sélectionné.
-week = thisWeek;
-selectedDay = ymd(new Date());
-api('/api/config').then((c) => { conf = c; }).catch(() => {}).finally(loadMine);
-loadWeek();
+// On ouvre sur la semaine la plus proche qui contient une séance (sinon la semaine courante).
+async function start() {
+  api('/api/config').then((c) => { conf = c; }).catch(() => {}).finally(loadMine);
+  week = thisWeek;
+  selectedDay = ymd(new Date());
+  try {
+    const now = new Date();
+    const to = addDays(mondayOf(now), 70); // on cherche jusqu'à 10 semaines à l'avance
+    const ahead = await api(`/api/slots?from=${now.toISOString()}&to=${to.toISOString()}`);
+    const next = ahead.map((s) => new Date(s.starts_at)).filter((dt) => dt >= now).sort((a, b) => a - b)[0];
+    if (next) { week = mondayOf(next); selectedDay = ymd(next); }
+  } catch { /* on reste sur la semaine courante */ }
+  loadWeek();
+}
+start();
