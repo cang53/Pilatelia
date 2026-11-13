@@ -174,8 +174,8 @@ function reminderEmail(s, slot) {
 function instagramUrl(raw) {
   const v = String(raw || '').trim();
   if (!v) return '';
-  if (/^https?:\/\//i.test(v)) return v;
-  return `https://instagram.com/${v.replace(/^@/, '')}`;
+  if (/^https?:\/\//i.test(v)) return v.replace(/^(https?:\/\/)(instagram\.com)/i, '$1www.$2');
+  return `https://www.instagram.com/${v.replace(/^@/, '')}`;
 }
 
 async function config(env) {
