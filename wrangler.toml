@@ -12,3 +12,8 @@ binding = "ASSETS"
 [triggers]
 crons = ["0 * * * *"]
 
+
+# Aperçus de branche : Cloudflare peut lancer `wrangler preview` sur les builds
+# de branche, qui exige ce bloc (sinon : "needs a `previews` block").
+# Les crons ne s'appliquent pas aux aperçus, seulement à la production.
+[previews]
