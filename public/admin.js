@@ -11,10 +11,13 @@ $('[data-week="-1"]').innerHTML = ic('chevronL');
 $('[data-week="1"]').innerHTML = ic('chevronR');
 $('#addBtn').innerHTML = `${ic('plus')} Ajouter un cours`;
 $('#exportBtn').innerHTML = `${ic('instagram')} Story`;
+$('#clearBtn').innerHTML = `${ic('trash')} Vider la semaine`;
+$('#pwdIc').innerHTML = ic('key');
 $('#presIc').innerHTML = ic('tag');
 $('#studioIc').innerHTML = ic('edit');
 $('#shareStory').innerHTML = `${ic('share')} Partager la story`;
 $('#saveStory').innerHTML = `${ic('download')} Enregistrer la photo`;
+$('#bgLabel').insertAdjacentHTML('afterbegin', ic('edit'));
 
 async function adminApi(path, opts = {}) {
   try { return await api(path, { ...opts, headers: { 'x-admin-key': key } }); }
@@ -94,7 +97,8 @@ function openSession(id) {
   const n = s.bookings.length;
   const people = n ? s.bookings.map((b) => `<div class="person">
       <span class="av">${esc(initials(b.guest_name))}</span>
-      <span class="who"><div>${esc(b.guest_name)}</div><a href="mailto:${esc(b.guest_email)}">${esc(b.guest_email)}</a></span>
+      <span class="who"><div>${esc(b.guest_name)}</div><a href="mailto:${esc(b.guest_email)}">${esc(b.guest_email)}</a>${b.guest_phone
+        ? `<span class="phone-links"><a href="${esc(telLink(b.guest_phone))}">${ic('phone')} ${esc(b.guest_phone)}</a><a class="wa" href="${esc(waLink(b.guest_phone))}" target="_blank" rel="noopener">${ic('whatsapp')} WhatsApp</a></span>` : ''}</span>
       ${flagged[b.guest_email] ? `<span class="flag">${ic('flag')} &lt; 24h</span>` : ''}
       <button class="rm" data-del-booking="${b.id}" data-name="${esc(b.guest_name)}">Retirer</button>
     </div>`).join('') : '<p class="muted">Personne d\'inscrite pour l\'instant.</p>';
@@ -107,15 +111,31 @@ function openSession(id) {
       <div class="grid2">
         <label>Prénom et nom <input name="name" required maxlength="100" /></label>
         <label>E-mail <input name="email" type="email" required maxlength="160" /></label>
+        <label class="span2">Téléphone <input name="phone" type="tel" required maxlength="40" placeholder="0470 12 34 56" /></label>
       </div>
       <p class="error" id="addPersonError"></p>
       <button class="btn btn-secondary btn-block" type="submit">${ic('plus')} Inscrire cette personne</button>
     </form>
+    ${new Date(s.starts_at) > new Date() ? `<details class="move">
+      <summary>${ic('move')} Déplacer / modifier ce cours</summary>
+      <form id="moveForm" data-class="${s.id}">
+        <div class="grid2">
+          <label>Jour <input type="date" name="date" required min="${ymd(new Date())}" value="${ymd(d)}" /></label>
+          <label>Heure <input type="time" name="time" required step="300" value="${hhmm(d)}" /></label>
+          <label>Durée (min) <input type="number" name="duration_minutes" required min="10" max="240" value="${s.duration_minutes}" /></label>
+          <label>Places <input type="number" name="capacity" required min="${Math.max(1, n)}" max="100" value="${s.capacity}" /></label>
+        </div>
+        ${n ? `<p class="muted small" style="margin:0 0 10px">Si l'horaire change, ${n > 1 ? `les ${n} inscrites recevront` : 'l\'inscrite recevra'} un e-mail avec le nouvel horaire.</p>` : ''}
+        <p class="error" id="moveError"></p>
+        <button class="btn btn-primary btn-block" type="submit">Enregistrer</button>
+      </form>
+    </details>` : ''}
     <button class="btn btn-ghost btn-block" style="margin-top:14px;color:var(--danger)" data-del-slot="${s.id}" data-count="${n}">${ic('trash')} Supprimer ce cours</button>
     <button class="btn btn-ghost btn-block" data-close style="margin-top:4px">Fermer</button>`;
   $('#sessionSheet').showModal();
 }
 const full = (s) => s.bookings.length >= s.capacity;
+const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 $('#grid').addEventListener('click', (e) => {
   const c = e.target.closest('[data-id]');
@@ -142,6 +162,25 @@ $('#sessionSheet').addEventListener('click', async (e) => {
   } catch (err) { toast(err.message); }
 });
 
+// Déplacer / modifier un cours depuis son détail.
+$('#sessionSheet').addEventListener('submit', async (e) => {
+  const f = e.target.closest('#moveForm');
+  if (!f) return;
+  e.preventDefault();
+  $('#moveError').textContent = '';
+  const starts = new Date(`${f.date.value}T${f.time.value}`);
+  try {
+    const res = await adminApi('/api/admin/slots', { method: 'PATCH', body: JSON.stringify({
+      id: f.dataset.class, starts_at: starts.toISOString(),
+      duration_minutes: Number(f.duration_minutes.value), capacity: Number(f.capacity.value),
+    }) });
+    toast(res.notified ? `Cours déplacé · ${plural(res.notified, 'cliente')} prévenue${res.notified > 1 ? 's' : ''}` : 'Cours mis à jour');
+    week = mondayOf(starts);
+    await loadAgenda();
+    openSession(f.dataset.class);
+  } catch (err) { $('#moveError').textContent = err.message; }
+});
+
 // Inscription manuelle d'une personne depuis le détail de cours.
 $('#sessionSheet').addEventListener('submit', async (e) => {
   const f = e.target.closest('#addPersonForm');
@@ -154,6 +193,7 @@ $('#sessionSheet').addEventListener('submit', async (e) => {
       class_id: classId,
       name: f.querySelector('[name="name"]').value.trim(),
       email: f.querySelector('[name="email"]').value.trim(),
+      phone: f.querySelector('[name="phone"]').value.trim(),
     }) });
     toast('Personne inscrite · e-mail envoyé');
     await loadAgenda();
@@ -233,6 +273,23 @@ $('#copyBtn').addEventListener('click', async () => {
   } catch (err) { toast(err.message); }
 });
 
+// Vider la semaine affichée (cours à venir uniquement) pour repartir de zéro.
+$('#clearBtn').addEventListener('click', async () => {
+  const now = new Date();
+  const upcoming = agendaSlots.filter((s) => new Date(s.starts_at) > now);
+  if (!upcoming.length) return toast('Aucun cours à venir à supprimer cette semaine.');
+  const people = upcoming.reduce((n, s) => n + s.bookings.length, 0);
+  const msg = `Supprimer les ${plural(upcoming.length, 'cours')} à venir de la semaine du ${weekLabel(week)} ?`
+    + (people ? `\n\n${plural(people, 'réservation')} ser${people > 1 ? 'ont annulées' : 'a annulée'} et les clientes recevront un e-mail d'annulation.` : '')
+    + '\n\nLes cours déjà passés sont conservés.';
+  if (!confirm(msg)) return;
+  try {
+    const res = await adminApi(`/api/admin/slots?${weekQuery(week)}`, { method: 'DELETE' });
+    toast(`Semaine vidée · ${plural(res.deleted, 'cours')} supprimé${res.deleted > 1 ? 's' : ''}`);
+    loadAgenda();
+  } catch (err) { toast(err.message); }
+});
+
 // ---------- Prestations ----------
 
 async function loadServices() {
@@ -305,9 +362,11 @@ async function loadReport() {
 
   const date = (t) => (t ? fmt.date.format(new Date(t)) : '—');
   $('#clientTable').innerHTML = report.clients.length
-    ? `<thead><tr><th>Nom</th><th>E-mail</th><th class="num">Séances</th><th class="num">À venir</th><th>Dernière</th><th class="num">&lt;24h</th></tr></thead>
+    ? `<thead><tr><th>Nom</th><th>Téléphone</th><th>E-mail</th><th class="num">Séances</th><th class="num">À venir</th><th>Dernière</th><th class="num">&lt;24h</th></tr></thead>
        <tbody>${report.clients.map((c) => `<tr>
-         <td>${esc(c.name)}</td><td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></td>
+         <td>${esc(c.name)}</td>
+         <td>${c.phone ? `<a href="${esc(telLink(c.phone))}">${esc(c.phone)}</a> <a class="wa-mini" href="${esc(waLink(c.phone))}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic('whatsapp')}</a>` : '<span class="muted">—</span>'}</td>
+         <td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></td>
          <td class="num">${c.total}</td><td class="num">${c.upcoming}</td><td>${date(c.last)}</td>
          <td class="num">${c.late ? `<span class="flag" style="padding:2px 8px">${c.late}</span>` : '—'}</td>
        </tr>`).join('')}</tbody>`
@@ -318,8 +377,8 @@ $('#csv').addEventListener('click', () => {
   if (!report) return;
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const iso = (t) => (t ? ymd(new Date(t)) : '');
-  const lines = [['Nom', 'E-mail', 'Séances', 'À venir', 'Dernière venue', 'Annulations tardives'],
-    ...report.clients.map((c) => [c.name, c.email, c.total, c.upcoming, iso(c.last), c.late || 0])];
+  const lines = [['Nom', 'Téléphone', 'E-mail', 'Séances', 'À venir', 'Dernière venue', 'Annulations tardives'],
+    ...report.clients.map((c) => [c.name, c.phone || '', c.email, c.total, c.upcoming, iso(c.last), c.late || 0])];
   const blob = new Blob(['﻿' + lines.map((l) => l.map(cell).join(';')).join('\n')], { type: 'text/csv' });
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `clientes-${ymd(new Date())}.csv` });
   a.click(); URL.revokeObjectURL(a.href);
@@ -327,52 +386,246 @@ $('#csv').addEventListener('click', () => {
 
 // ---------- Export story (canvas 1080 x 1920) ----------
 
-const STORY = { bg: '#f4ebdf', band: '#e6ecd9', ink: '#3a2e22', muted: '#7b6b56', brand: '#6e4d32', brandStrong: '#583c26', sage: '#788e68', sageTint: '#e6ecd9' };
+// Reprend la DA de l'affiche « Nos Horaires » du studio : mur sauge, vague beige,
+// arche lumineuse, jours en colonnes (lun→jeu puis ven→dim), heures centrées.
+const STORY = {
+  wallTop: '#97a37c', wallBottom: '#7e8a64', wave: '#b5a189', waveLine: '#e9dcc6',
+  archFill: 'rgba(176,152,124,.86)', archFill2: 'rgba(150,126,100,.9)', glow: '#ffd24a',
+  mirror: 'rgba(214,180,110,.55)', floorTop: '#b8916a', floorBottom: '#8f6c4b', text: '#fffaf1', line: 'rgba(255,250,241,.85)',
+};
+const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+const ddmm = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+const storyTime = (d) => `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
+let storyStudio = null;
+let storyBg;               // undefined = pas encore chargé, null = fond par défaut, sinon <img>
+
+const loadImage = (src) => new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = src; });
+
+async function loadStoryBg() {
+  try {
+    const { image } = await adminApi('/api/admin/story-bg');
+    storyBg = image ? await loadImage(image) : null;
+  } catch { storyBg = null; }
+}
+
+// Dessine une image en « cover » (remplit tout le cadre, recadrée au centre).
+function drawCover(g, img, W, H) {
+  const k = Math.max(W / img.width, H / img.height);
+  const w = img.width * k, h = img.height * k;
+  g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+}
+
+function archPath(g, x, y, w, h, close = true) {
+  const r = w / 2;
+  g.beginPath();
+  g.moveTo(x, y + h); g.lineTo(x, y + r);
+  g.arc(x + r, y + r, r, Math.PI, 0);
+  g.lineTo(x + w, y + h);
+  if (close) g.closePath();
+}
+
+// Plus grande taille (≤ max) pour que chaque texte tienne dans `width`.
+function fitSize(g, texts, font, max, width) {
+  let size = max;
+  for (const t of texts) {
+    g.font = font(max);
+    const w = g.measureText(t).width;
+    if (w > width) size = Math.min(size, Math.floor(max * width / w));
+  }
+  return size;
+}
+
+// Icônes du pied (tracés SVG 24×24 mis à l'échelle).
+function storyIcon(g, name, x, y, size) {
+  const k = size / 24;
+  g.save(); g.translate(x, y); g.scale(k, k);
+  g.strokeStyle = STORY.text; g.fillStyle = STORY.text; g.lineWidth = 2; g.lineJoin = 'round'; g.lineCap = 'round';
+  if (name === 'pin') {
+    g.fill(new Path2D('M12 23s8-7 8-13.5a8 8 0 1 0-16 0C4 16 12 23 12 23z'));
+    g.fillStyle = STORY.floorBottom; g.beginPath(); g.arc(12, 9.5, 3, 0, 7); g.fill();
+  } else if (name === 'instagram') {
+    g.stroke(new Path2D('M7 2.5h10A4.5 4.5 0 0 1 21.5 7v10a4.5 4.5 0 0 1-4.5 4.5H7A4.5 4.5 0 0 1 2.5 17V7A4.5 4.5 0 0 1 7 2.5z'));
+    g.beginPath(); g.arc(12, 12, 4.3, 0, 7); g.stroke();
+    g.beginPath(); g.arc(17.4, 6.6, 1.2, 0, 7); g.fill();
+  } else if (name === 'whatsapp') {
+    g.stroke(new Path2D('M3.2 20.8 4.6 16A9.3 9.3 0 1 1 8 19.5z'));
+    g.fill(new Path2D('M8.6 7.4c.4-.4 1-.4 1.3 0l1.1 1.9c.2.4.1.8-.2 1.1l-.6.6c.6 1.3 1.6 2.3 2.9 2.9l.6-.6c.3-.3.7-.4 1.1-.2l1.9 1.1c.4.3.4.9 0 1.3l-.7.8c-.6.6-1.5.8-2.3.5-2.7-1-4.8-3.1-5.8-5.8-.3-.8-.1-1.7.5-2.3z'));
+  }
+  g.restore();
+}
 
 async function drawStory() {
   const g = $('#storyCanvas').getContext('2d');
   const W = 1080, H = 1920;
-  try { await document.fonts.load('600 92px Fraunces'); await document.fonts.load('600 34px Figtree'); await document.fonts.ready; } catch {}
-  g.fillStyle = STORY.bg; g.fillRect(0, 0, W, H);
-  g.fillStyle = STORY.band; g.fillRect(0, 0, W, 470);
-  g.fillStyle = STORY.sageTint; g.beginPath(); g.arc(950, 150, 150, 0, 7); g.fill();
+  try {
+    await Promise.all(['600 60px Fredoka', '500 60px Quicksand', '700 60px Quicksand', '160px "Great Vibes"'].map((f) => document.fonts.load(f)));
+    await document.fonts.ready;
+  } catch {}
+  if (!storyStudio) storyStudio = await adminApi('/api/admin/studio').catch(() => ({}));
+  if (storyBg === undefined) await loadStoryBg();
+  $('#resetBg').hidden = !storyBg;
+  g.save();
+  g.clearRect(0, 0, W, H);
   g.textBaseline = 'alphabetic';
-  g.fillStyle = STORY.brand; g.font = '600 30px Fraunces'; g.fillText('P I L A T E L I A', 80, 150);
-  g.fillStyle = STORY.ink; g.font = '600 96px Fraunces';
-  g.fillText('Les dispos', 80, 290); g.fillText('de la semaine', 80, 390);
-  g.fillStyle = STORY.muted; g.font = '600 34px Figtree';
-  g.fillText(`${fmt.short.format(week)} — ${fmt.short.format(addDays(week, 6))}`, 82, 445);
-  const days = byDay(agendaSlots);
-  let y = 600, any = false;
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(week, i);
-    const items = (days.get(ymd(d)) || []).slice().sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-    if (!items.length) continue;
-    any = true;
-    g.fillStyle = STORY.brandStrong; g.font = '700 30px Figtree';
-    g.fillText(fmt.day.format(d).split(' ').slice(0, 2).join(' ').toUpperCase(), 82, y); y += 50;
-    for (const s of items) {
-      const st = new Date(s.starts_at);
-      const en = new Date(st.getTime() + (s.duration_minutes || 55) * 60000);
-      g.fillStyle = STORY.ink; g.font = '600 40px Figtree'; g.fillText(`${fmt.time.format(st)} – ${fmt.time.format(en)}`, 82, y);
-      g.fillStyle = STORY.muted; g.font = '500 40px Figtree'; g.fillText(s.title, 420, y); y += 58;
-    }
-    y += 26; if (y > 1680) break;
+  const floorY = 1655;
+
+  if (storyBg) {
+    // Fond du studio (son visuel vierge) : on n'ajoute que les textes par-dessus.
+    drawCover(g, storyBg, W, H);
+  } else {
+
+  // Mur sauge
+  let grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, STORY.wallTop); grad.addColorStop(1, STORY.wallBottom);
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+
+  // Vague beige en haut à gauche (+ filet clair)
+  g.fillStyle = STORY.wave;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(860, 0);
+  g.bezierCurveTo(700, 40, 560, 200, 360, 250); g.bezierCurveTo(200, 290, 70, 330, 0, 470); g.closePath(); g.fill();
+  g.strokeStyle = STORY.waveLine; g.lineWidth = 4;
+  g.beginPath(); g.moveTo(950, 0); g.bezierCurveTo(780, 70, 620, 250, 400, 300); g.bezierCurveTo(230, 340, 90, 380, 0, 540); g.stroke();
+
+  // Sol en bois
+  grad = g.createLinearGradient(0, floorY, 0, H);
+  grad.addColorStop(0, STORY.floorTop); grad.addColorStop(1, STORY.floorBottom);
+  g.fillStyle = grad; g.fillRect(0, floorY, W, H - floorY);
+  g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(0, floorY, W, 6);
+
+  // Arche : remplissage, miroir, puis halo lumineux
+  const AX = 120, AY = 400, AW = 840, AH = floorY - AY;
+  grad = g.createLinearGradient(0, AY, 0, floorY);
+  grad.addColorStop(0, STORY.archFill); grad.addColorStop(1, STORY.archFill2);
+  archPath(g, AX, AY, AW, AH); g.fillStyle = grad; g.fill();
+  archPath(g, AX + 150, AY + 180, AW - 300, AH - 220); g.strokeStyle = STORY.mirror; g.lineWidth = 5; g.stroke();
+  g.save();
+  g.shadowColor = STORY.glow; g.lineCap = 'round';
+  for (const [blur, width, alpha] of [[90, 26, 0.35], [45, 14, 0.6], [16, 7, 1]]) {
+    g.shadowBlur = blur; g.globalAlpha = alpha; g.lineWidth = width; g.strokeStyle = STORY.glow;
+    archPath(g, AX, AY, AW, AH, false); g.stroke();
   }
-  if (!any) { g.fillStyle = STORY.muted; g.font = '500 40px Figtree'; g.fillText('Planning à venir — écrivez-nous !', 82, 640); }
-  g.fillStyle = STORY.sageTint; g.fillRect(0, H - 150, W, 150);
-  g.fillStyle = STORY.brandStrong; g.font = '700 36px Figtree'; g.fillText('Réservez depuis l\'app · lien en bio', 80, H - 60);
+  g.restore();
+  }
+
+  // Textes (blanc cassé, légère ombre pour la lisibilité)
+  g.fillStyle = STORY.text;
+  g.shadowColor = storyBg ? 'rgba(40,28,16,.6)' : 'rgba(60,40,20,.35)';
+  g.shadowBlur = storyBg ? 12 : 8; g.shadowOffsetY = 2;
+  g.textAlign = 'center';
+  g.font = '500 64px Quicksand'; g.fillText('Semaine', 190, 100);
+  g.fillText(ddmm(week), 190, 178);
+
+  // « Nos Horaires » : script + capitale, centrés ensemble
+  g.font = '160px "Great Vibes"'; const wNos = g.measureText('Nos').width;
+  g.font = '500 76px Quicksand'; const wHor = g.measureText('Horaires').width;
+  const gap = 22, tx = 600 - (wNos + gap + wHor) / 2;
+  g.textAlign = 'left';
+  g.font = '160px "Great Vibes"'; g.fillText('Nos', tx, 330);
+  g.font = '500 76px Quicksand'; g.fillText('Horaires', tx + wNos + gap, 318);
+
+  // Séances par jour
+  const days = byDay(agendaSlots);
+  const cols = DAY_NAMES.map((name, i) => {
+    const d = addDays(week, i);
+    const items = (days.get(ymd(d)) || []).map((s) => new Date(s.starts_at)).sort((a, b) => a - b);
+    return { name, date: ddmm(d), lines: items.length ? items.map(storyTime) : ['Day', 'OFF'], off: !items.length };
+  });
+  const rows = [cols.slice(0, 4), cols.slice(4)];
+  const left = 170, right = 910, innerW = right - left;
+  const headH = 128, rowGap = 64, top = 600, bottom = floorY - 50;
+  const counts = rows.map((r) => Math.max(...r.map((c) => c.lines.length)));
+  const lineH = Math.min(86, (bottom - top - headH * 2 - rowGap) / (counts[0] + counts[1]));
+
+  // Tailles UNIQUES pour toute l'image : toutes les heures s'alignent sur la même grille.
+  const colW = innerW / 4;
+  const headSize = fitSize(g, cols.flatMap((c) => [c.name, c.date]), (s) => `700 ${s}px Quicksand`, 46, colW - 16);
+  const timeSize = fitSize(g, cols.flatMap((c) => c.lines), (s) => `600 ${s}px Fredoka`, Math.min(64, Math.round(lineH * 0.75)), colW - 44);
+
+  let y = top;
+  rows.forEach((row, ri) => {
+    const cw = innerW / row.length;
+    const rowEnd = y + headH + counts[ri] * lineH;
+    g.textAlign = 'center';
+    row.forEach((c, ci) => {
+      const cx = left + cw * ci + cw / 2;
+      g.font = `700 ${headSize}px Quicksand`;
+      g.fillText(c.name, cx, y + headSize);
+      g.fillText(c.date, cx, y + headSize * 2 + 8);
+      g.font = `600 ${timeSize}px Fredoka`;
+      c.lines.forEach((t, li) => g.fillText(t, cx, y + headH + li * lineH + timeSize * 0.85));
+      if (ci > 0) { // séparateur vertical entre colonnes
+        g.save(); g.shadowBlur = 0; g.shadowOffsetY = 0; g.fillStyle = STORY.line;
+        g.fillRect(Math.round(left + cw * ci) - 1.5, y + headH - 12, 3, rowEnd - (y + headH) + 4);
+        g.restore();
+      }
+    });
+    y = rowEnd + rowGap;
+  });
+
+  // Pied : adresse, Instagram, WhatsApp
+  const st = storyStudio || {};
+  g.textAlign = 'left';
+  const footFont = (s) => `700 ${s}px Quicksand`;
+  let fy = floorY + 78;
+  if (st.address) {
+    const parts = st.address.includes(',') ? [st.address.slice(0, st.address.indexOf(',') + 1), st.address.slice(st.address.indexOf(',') + 1).trim()] : [st.address];
+    const size = fitSize(g, parts, footFont, 44, 860);
+    storyIcon(g, 'pin', 110, fy - 46, 54);
+    g.font = footFont(size);
+    parts.forEach((p, i) => g.fillText(p, 180, fy + i * 52));
+    fy += parts.length * 52 + 34;
+  }
+  const insta = String(st.instagram || '').trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/[/?#].*$/, '').replace(/^@/, '');
+  const items = [insta && ['instagram', insta], st.phone && ['whatsapp', st.phone]].filter(Boolean);
+  if (items.length) {
+    const size = fitSize(g, [items.map((i) => i[1]).join('      ')], footFont, 44, 800);
+    g.font = footFont(size);
+    let fx = 110;
+    for (const [icon, label] of items) {
+      storyIcon(g, icon, fx, fy - size + 2, size + 6);
+      g.fillText(label, fx + size + 22, fy);
+      fx += size + 22 + g.measureText(label).width + 60;
+    }
+  }
+  g.restore();
 }
 const storyBlob = () => new Promise((res) => $('#storyCanvas').toBlob(res, 'image/png'));
 
-$('#exportBtn').addEventListener('click', async () => { $('#story').showModal(); await drawStory(); });
+$('#exportBtn').addEventListener('click', async () => { storyStudio = null; storyBg = undefined; $('#story').showModal(); await drawStory(); });
+
+// Fond personnalisé : l'image est recadrée en 1080×1920 et compressée avant l'envoi.
+$('#bgInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await loadImage(url);
+    URL.revokeObjectURL(url);
+    const c = Object.assign(document.createElement('canvas'), { width: 1080, height: 1920 });
+    drawCover(c.getContext('2d'), img, 1080, 1920);
+    let data = c.toDataURL('image/jpeg', 0.85);
+    if (data.length > 3_500_000) data = c.toDataURL('image/jpeg', 0.7);
+    await adminApi('/api/admin/story-bg', { method: 'POST', body: JSON.stringify({ image: data }) });
+    storyBg = await loadImage(data);
+    await drawStory();
+    toast('Fond enregistré');
+  } catch (err) { toast(err.message || 'Image illisible.'); }
+});
+$('#resetBg').addEventListener('click', async () => {
+  if (!confirm('Revenir au fond dessiné par défaut ?')) return;
+  try {
+    await adminApi('/api/admin/story-bg', { method: 'POST', body: JSON.stringify({ image: null }) });
+    storyBg = null; await drawStory(); toast('Fond par défaut rétabli');
+  } catch (err) { toast(err.message); }
+});
 $('#saveStory').addEventListener('click', async () => {
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await storyBlob()), download: `pilatelia-dispos-${ymd(week)}.png` });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await storyBlob()), download: `pilatelia-horaires-${ymd(week)}.png` });
   a.click(); URL.revokeObjectURL(a.href);
 });
 $('#shareStory').addEventListener('click', async () => {
-  const file = new File([await storyBlob()], `pilatelia-dispos-${ymd(week)}.png`, { type: 'image/png' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: 'Dispos de la semaine' }); } catch {} return; }
+  const file = new File([await storyBlob()], `pilatelia-horaires-${ymd(week)}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: 'Nos horaires' }); } catch {} return; }
   toast('Partage direct indisponible : utilisez « Enregistrer la photo ».');
 });
 
@@ -400,6 +653,21 @@ $('#studioForm').addEventListener('submit', async (e) => {
     }) });
     toast('Infos studio enregistrées');
   } catch (err) { $('#studioError').textContent = err.message; }
+});
+
+// Changer le mot de passe de l'espace studio.
+$('#pwdForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  $('#pwdError').textContent = '';
+  if (f.next.value !== f.confirm.value) { $('#pwdError').textContent = 'Les deux nouveaux mots de passe ne correspondent pas.'; return; }
+  try {
+    await adminApi('/api/admin/password', { method: 'POST', body: JSON.stringify({ current: f.current.value, next: f.next.value }) });
+    key = f.next.value;
+    sessionStorage.setItem('pilatelia-admin', key);
+    f.reset();
+    toast('Mot de passe modifié');
+  } catch (err) { $('#pwdError').textContent = err.message; }
 });
 
 const loaders = { agenda: loadAgenda, prestations: loadServices, finances: loadFinance, clients: loadReport, studio: loadStudioSettings };

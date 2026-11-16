@@ -8,7 +8,7 @@
   <title>Pilatelia — Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..40,500;9..40,600&family=Fredoka:wght@600&family=Quicksand:wght@500;700&family=Great+Vibes&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -43,6 +43,7 @@
           <button class="btn btn-primary" id="addBtn"></button>
           <button class="btn btn-secondary" id="copyBtn">Copier semaine préc.</button>
           <button class="btn btn-secondary" id="exportBtn"></button>
+          <button class="btn btn-ghost btn-danger" id="clearBtn"></button>
         </div>
         <div id="grid" aria-live="polite"></div>
       </section>
@@ -104,6 +105,18 @@
           <p class="error" id="studioError" role="alert"></p>
           <button class="btn btn-primary btn-block">Enregistrer</button>
         </form>
+
+        <form id="pwdForm" class="card" style="margin-top:14px">
+          <h2 style="font-size:18px;margin-bottom:12px;display:flex;align-items:center;gap:8px"><span id="pwdIc"></span> Mot de passe de l'espace studio</h2>
+          <input type="text" name="username" value="studio" autocomplete="username" hidden />
+          <label>Mot de passe actuel <input type="password" name="current" required autocomplete="current-password" /></label>
+          <div class="grid2">
+            <label>Nouveau <input type="password" name="next" required minlength="6" autocomplete="new-password" /></label>
+            <label>Confirmer <input type="password" name="confirm" required minlength="6" autocomplete="new-password" /></label>
+          </div>
+          <p class="error" id="pwdError" role="alert"></p>
+          <button class="btn btn-secondary btn-block">Changer le mot de passe</button>
+        </form>
       </section>
     </div>
   </main>
@@ -142,10 +155,15 @@
   <dialog class="sheet" id="story">
     <div class="panel">
       <div class="grip"></div>
-      <h2>Story de la semaine</h2>
-      <p class="meta">Belle image à poster sur votre story Instagram.</p>
+      <h2>Nos horaires de la semaine</h2>
+      <p class="meta">Image au style de votre affiche, prête pour la story Instagram.</p>
       <div class="story-stage"><canvas id="storyCanvas" width="1080" height="1920"></canvas></div>
       <p class="hint">Image 1080 × 1920, prête pour votre story.</p>
+      <div class="bg-actions">
+        <label class="btn btn-secondary" id="bgLabel"> Utiliser mon fond<input type="file" id="bgInput" accept="image/*" hidden /></label>
+        <button class="btn btn-ghost" id="resetBg" hidden>Fond par défaut</button>
+      </div>
+      <p class="hint small">Importez votre visuel <strong>sans texte</strong> (format story 9:16) : les horaires, l'adresse et les contacts s'écrivent par-dessus.</p>
       <button class="btn btn-primary btn-block" id="shareStory"></button>
       <button class="btn btn-secondary btn-block" id="saveStory" style="margin-top:10px"></button>
       <button class="btn btn-ghost btn-block" data-close style="margin-top:4px">Fermer</button>

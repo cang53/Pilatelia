@@ -90,6 +90,20 @@ svg.ic { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round;
 .btn-primary { background:var(--brand); color:var(--on-brand); }
 .btn-secondary { background:var(--surface-100); color:var(--ink); border:1px solid var(--border); }
 .btn-ghost { background:transparent; color:var(--brand); }
+.btn-wa { background:#25a55f; color:#fff; }
+.btn-danger { color:var(--danger); }
+.phone-links { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:2px; }
+.person .who .phone-links a { display:inline-flex; align-items:center; gap:4px; font-size:12px; color:var(--ink-muted); }
+.person .who .phone-links a.wa { color:#1f8f52; font-weight:600; }
+.phone-links svg { width:13px; height:13px; }
+.wa-mini { color:#1f8f52; vertical-align:middle; }
+.wa-mini svg { width:16px; height:16px; }
+details.move { margin-top:16px; border:1px solid var(--border); border-radius:var(--radius-md); padding:0 14px; background:var(--surface-50); }
+details.move summary { cursor:pointer; list-style:none; padding:13px 0; font-weight:700; color:var(--brand); display:flex; align-items:center; gap:8px; }
+details.move summary::-webkit-details-marker { display:none; }
+details.move summary svg { width:18px; height:18px; }
+details.move form { padding-bottom:14px; }
+#pwdIc svg { width:20px; height:20px; color:var(--brand); }
 .btn-block { width:100%; padding:15px; font-size:16px; }
 .btn:disabled { background:var(--surface-200); color:var(--ink-faint); border:none; }
 
@@ -198,6 +212,8 @@ input:focus, select:focus, textarea:focus { outline:2px solid var(--brand); outl
 .story-stage { display:flex; justify-content:center; padding:8px 0 16px; }
 #storyCanvas { width:270px; height:480px; border-radius:24px; box-shadow:var(--shadow-lg); background:var(--surface-100); }
 .hint { text-align:center; color:var(--ink-muted); font-size:13px; margin:0 0 14px; }
+.bg-actions { display:flex; gap:8px; justify-content:center; margin-bottom:8px; }
+.bg-actions label.btn { margin:0; color:var(--ink); font-size:14px; padding:10px 16px; cursor:pointer; }
 
 /* Rapport clientes */
 .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
