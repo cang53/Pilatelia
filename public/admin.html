@@ -159,6 +159,11 @@
       <p class="meta">Image au style de votre affiche, prête pour la story Instagram.</p>
       <div class="story-stage"><canvas id="storyCanvas" width="1080" height="1920"></canvas></div>
       <p class="hint">Image 1080 × 1920, prête pour votre story.</p>
+      <div class="bg-actions">
+        <label class="btn btn-secondary" id="bgLabel"> Utiliser mon fond<input type="file" id="bgInput" accept="image/*" hidden /></label>
+        <button class="btn btn-ghost" id="resetBg" hidden>Fond par défaut</button>
+      </div>
+      <p class="hint small">Importez votre visuel <strong>sans texte</strong> (format story 9:16) : les horaires, l'adresse et les contacts s'écrivent par-dessus.</p>
       <button class="btn btn-primary btn-block" id="shareStory"></button>
       <button class="btn btn-secondary btn-block" id="saveStory" style="margin-top:10px"></button>
       <button class="btn btn-ghost btn-block" data-close style="margin-top:4px">Fermer</button>

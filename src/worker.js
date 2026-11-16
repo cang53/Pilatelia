@@ -568,6 +568,24 @@ async function saveStudio(request, env) {
   return json({ ok: true });
 }
 
+// Fond de la story Instagram (image JPEG redimensionnée côté navigateur, stockée en data URL).
+async function getStoryBg(env) {
+  const rows = await db(env, 'studio_settings?select=story_bg&limit=1');
+  return json({ image: rows?.[0]?.story_bg || null });
+}
+
+async function saveStoryBg(request, env) {
+  const { image } = await request.json().catch(() => ({}));
+  if (image !== null && !(typeof image === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image) && image.length < 4_000_000)) {
+    throw new HttpError(400, 'Image invalide ou trop lourde.');
+  }
+  await db(env, 'studio_settings?on_conflict=singleton', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ singleton: true, story_bg: image, updated_at: new Date().toISOString() }),
+  });
+  return json({ ok: true });
+}
+
 // Inscription manuelle d'une personne à un cours (par le studio).
 async function addBooking(request, env, ctx) {
   const { class_id, name, email, phone } = await request.json().catch(() => ({}));
@@ -599,6 +617,8 @@ async function admin(request, url, env, ctx) {
   if (route === 'PATCH /api/admin/slots') return updateSlot(request, env, ctx);
   if (route === 'DELETE /api/admin/slots') return url.searchParams.has('id') ? removeSlot(url, env) : clearSlots(url, env, ctx);
   if (route === 'POST /api/admin/password') return changePassword(request, env);
+  if (route === 'GET /api/admin/story-bg') return getStoryBg(env);
+  if (route === 'POST /api/admin/story-bg') return saveStoryBg(request, env);
   if (route === 'POST /api/admin/bookings') return addBooking(request, env, ctx);
   if (route === 'DELETE /api/admin/bookings') return removeBooking(url, env, ctx);
   if (route === 'GET /api/admin/report') return report(env);

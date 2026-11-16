@@ -212,6 +212,8 @@ input:focus, select:focus, textarea:focus { outline:2px solid var(--brand); outl
 .story-stage { display:flex; justify-content:center; padding:8px 0 16px; }
 #storyCanvas { width:270px; height:480px; border-radius:24px; box-shadow:var(--shadow-lg); background:var(--surface-100); }
 .hint { text-align:center; color:var(--ink-muted); font-size:13px; margin:0 0 14px; }
+.bg-actions { display:flex; gap:8px; justify-content:center; margin-bottom:8px; }
+.bg-actions label.btn { margin:0; color:var(--ink); font-size:14px; padding:10px 16px; cursor:pointer; }
 
 /* Rapport clientes */
 .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }

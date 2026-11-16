@@ -17,6 +17,7 @@ $('#presIc').innerHTML = ic('tag');
 $('#studioIc').innerHTML = ic('edit');
 $('#shareStory').innerHTML = `${ic('share')} Partager la story`;
 $('#saveStory').innerHTML = `${ic('download')} Enregistrer la photo`;
+$('#bgLabel').insertAdjacentHTML('afterbegin', ic('edit'));
 
 async function adminApi(path, opts = {}) {
   try { return await api(path, { ...opts, headers: { 'x-admin-key': key } }); }
@@ -396,6 +397,23 @@ const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 
 const ddmm = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 const storyTime = (d) => `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`;
 let storyStudio = null;
+let storyBg;               // undefined = pas encore chargé, null = fond par défaut, sinon <img>
+
+const loadImage = (src) => new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = src; });
+
+async function loadStoryBg() {
+  try {
+    const { image } = await adminApi('/api/admin/story-bg');
+    storyBg = image ? await loadImage(image) : null;
+  } catch { storyBg = null; }
+}
+
+// Dessine une image en « cover » (remplit tout le cadre, recadrée au centre).
+function drawCover(g, img, W, H) {
+  const k = Math.max(W / img.width, H / img.height);
+  const w = img.width * k, h = img.height * k;
+  g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+}
 
 function archPath(g, x, y, w, h, close = true) {
   const r = w / 2;
@@ -444,9 +462,17 @@ async function drawStory() {
     await document.fonts.ready;
   } catch {}
   if (!storyStudio) storyStudio = await adminApi('/api/admin/studio').catch(() => ({}));
+  if (storyBg === undefined) await loadStoryBg();
+  $('#resetBg').hidden = !storyBg;
   g.save();
   g.clearRect(0, 0, W, H);
   g.textBaseline = 'alphabetic';
+  const floorY = 1655;
+
+  if (storyBg) {
+    // Fond du studio (son visuel vierge) : on n'ajoute que les textes par-dessus.
+    drawCover(g, storyBg, W, H);
+  } else {
 
   // Mur sauge
   let grad = g.createLinearGradient(0, 0, 0, H);
@@ -461,7 +487,6 @@ async function drawStory() {
   g.beginPath(); g.moveTo(950, 0); g.bezierCurveTo(780, 70, 620, 250, 400, 300); g.bezierCurveTo(230, 340, 90, 380, 0, 540); g.stroke();
 
   // Sol en bois
-  const floorY = 1655;
   grad = g.createLinearGradient(0, floorY, 0, H);
   grad.addColorStop(0, STORY.floorTop); grad.addColorStop(1, STORY.floorBottom);
   g.fillStyle = grad; g.fillRect(0, floorY, W, H - floorY);
@@ -480,10 +505,12 @@ async function drawStory() {
     archPath(g, AX, AY, AW, AH, false); g.stroke();
   }
   g.restore();
+  }
 
   // Textes (blanc cassé, légère ombre pour la lisibilité)
   g.fillStyle = STORY.text;
-  g.shadowColor = 'rgba(60,40,20,.35)'; g.shadowBlur = 8; g.shadowOffsetY = 2;
+  g.shadowColor = storyBg ? 'rgba(40,28,16,.6)' : 'rgba(60,40,20,.35)';
+  g.shadowBlur = storyBg ? 12 : 8; g.shadowOffsetY = 2;
   g.textAlign = 'center';
   g.font = '500 64px Quicksand'; g.fillText('Semaine', 190, 100);
   g.fillText(ddmm(week), 190, 178);
@@ -564,7 +591,34 @@ async function drawStory() {
 }
 const storyBlob = () => new Promise((res) => $('#storyCanvas').toBlob(res, 'image/png'));
 
-$('#exportBtn').addEventListener('click', async () => { storyStudio = null; $('#story').showModal(); await drawStory(); });
+$('#exportBtn').addEventListener('click', async () => { storyStudio = null; storyBg = undefined; $('#story').showModal(); await drawStory(); });
+
+// Fond personnalisé : l'image est recadrée en 1080×1920 et compressée avant l'envoi.
+$('#bgInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await loadImage(url);
+    URL.revokeObjectURL(url);
+    const c = Object.assign(document.createElement('canvas'), { width: 1080, height: 1920 });
+    drawCover(c.getContext('2d'), img, 1080, 1920);
+    let data = c.toDataURL('image/jpeg', 0.85);
+    if (data.length > 3_500_000) data = c.toDataURL('image/jpeg', 0.7);
+    await adminApi('/api/admin/story-bg', { method: 'POST', body: JSON.stringify({ image: data }) });
+    storyBg = await loadImage(data);
+    await drawStory();
+    toast('Fond enregistré');
+  } catch (err) { toast(err.message || 'Image illisible.'); }
+});
+$('#resetBg').addEventListener('click', async () => {
+  if (!confirm('Revenir au fond dessiné par défaut ?')) return;
+  try {
+    await adminApi('/api/admin/story-bg', { method: 'POST', body: JSON.stringify({ image: null }) });
+    storyBg = null; await drawStory(); toast('Fond par défaut rétabli');
+  } catch (err) { toast(err.message); }
+});
 $('#saveStory').addEventListener('click', async () => {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await storyBlob()), download: `pilatelia-horaires-${ymd(week)}.png` });
   a.click(); URL.revokeObjectURL(a.href);

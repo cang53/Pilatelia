@@ -8,6 +8,9 @@ alter table public.bookings add column if not exists guest_phone text;
 -- Mot de passe oublié : `update public.studio_settings set admin_password_hash = null;`
 alter table public.studio_settings add column if not exists admin_password_hash text;
 
+-- Fond personnalisé de la story Instagram « Nos Horaires » (image JPEG en data URL, chargée depuis l'admin).
+alter table public.studio_settings add column if not exists story_bg text;
+
 -- Réservation atomique avec téléphone (remplace la version à 3 paramètres).
 drop function if exists public.book_class(uuid, text, text);
 create or replace function public.book_class(p_class_id uuid, p_name text, p_email text, p_phone text)
