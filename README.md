@@ -2,14 +2,15 @@
 
 Studio réservé aux femmes. Interface mobile, thème clair, **sans compte** : la cliente réserve en 2–3 taps, reçoit un e-mail de confirmation (boutons Google Agenda / Apple Calendar, + rappel la veille), et peut déplacer ou annuler sa séance en ligne jusqu'à 24h avant.
 
-- **`/`** — Réserver : s'ouvre sur la semaine la plus proche qui a une séance ; sélection du jour, réservation (nom + e-mail). Une séance déjà réservée depuis l'appareil s'affiche « Déjà inscrite » et renvoie vers sa gestion. Onglet **Ma réservation** : les réservations de l'appareil (3 max), boutons **Déplacer / Annuler** à plus de 24h, sinon « En cas de souci, appelez le studio ». Icône cadenas en haut à droite → espace studio.
+- **`/`** — Réserver : s'ouvre sur la semaine la plus proche qui a une séance ; sélection du jour, réservation (nom + e-mail + **téléphone obligatoire**). Une séance déjà réservée depuis l'appareil s'affiche « Déjà inscrite » et renvoie vers sa gestion. Onglet **Ma réservation** : les réservations de l'appareil (3 max), boutons **Déplacer / Annuler** à plus de 24h, sinon « appelez le studio ou écrivez sur WhatsApp ». Bloc contact : boutons **WhatsApp** (ouvre directement la conversation avec un message pré-rempli) et **Appeler**. Icône cadenas en haut à droite → espace studio.
 - **`/admin.html`** — Espace studio (gros caractères, utilisable aussi sur ordinateur) :
-  - **Agenda** — vraie grille semaine (jours × heures, créneaux vides visibles). Un créneau s'ouvre pour voir les inscrites, retirer une réservation (e-mail d'annulation), **flag « annulation < 24h »**. Ajout de cours **à n'importe quelle date** (plus de limite d'une semaine), avec répétition hebdo et copie de la semaine précédente, et **export story Instagram** (image 1080×1920).
+  - **Agenda** — vraie grille semaine (jours × heures, créneaux vides visibles). Un créneau s'ouvre pour voir les inscrites, retirer une réservation (e-mail d'annulation), **flag « annulation < 24h »**, **déplacer / modifier le cours** (jour, heure, durée, places — les inscrites reçoivent un e-mail avec le nouvel horaire). Téléphone + lien WhatsApp de chaque inscrite. Ajout de cours **à n'importe quelle date** (plus de limite d'une semaine), avec répétition hebdo et copie de la semaine précédente, **« Vider la semaine »** (supprime les cours à venir de la semaine, prévient les inscrites ; les cours passés restent pour les finances) et **export story Instagram « Nos Horaires »** (1080×1920, reprend l'affiche du studio : arche lumineuse, jours en colonnes, heures alignées, adresse / Instagram / WhatsApp en pied).
   - **Prestations** — catalogue des activités avec **tarif**, durée, places ; sélectionnable à l'ajout d'un cours. Le tarif s'affiche côté cliente.
   - **Finances** — dashboard : CA de la semaine, à venir, encaissé, par semaine et par prestation.
-  - **Clientes** — stats, tableau (dont annulations tardives), export CSV.
-  - **Studio** — nom, **adresse**, e-mail, téléphone, Instagram, modifiables directement (priment sur les variables d'env). L'adresse apparaît côté cliente et dans les e-mails.
-  - **Inscription manuelle** — depuis le détail d'un cours, la prof peut inscrire une personne (nom + e-mail) ; la cliente reçoit l'e-mail de confirmation.
+  - **Clientes** — stats, tableau avec **téléphone** (+ lien WhatsApp) et annulations tardives, export CSV.
+  - **Studio** — nom, **adresse**, e-mail, téléphone (sert aussi pour WhatsApp ; un numéro en 0… est considéré belge, +32), Instagram, modifiables directement (priment sur les variables d'env). L'adresse apparaît côté cliente et dans les e-mails.
+    **Changer le mot de passe** de l'espace studio (stocké haché en base ; tant qu'il n'a jamais été changé, c'est `ADMIN_PASSWORD` qui fait foi). Mot de passe oublié : dans Supabase → SQL Editor, `update public.studio_settings set admin_password_hash = null;` → on revient à `ADMIN_PASSWORD`.
+  - **Inscription manuelle** — depuis le détail d'un cours, la prof peut inscrire une personne (nom + e-mail + téléphone) ; la cliente reçoit l'e-mail de confirmation.
 
 Un seul Cloudflare Worker sert le site et l'API ; la clé Supabase et le mot de passe admin restent côté serveur.
 
@@ -27,7 +28,7 @@ npx supabase link --project-ref rhwpgcnqztrtymhoqsev
 npx supabase db push
 ```
 
-Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
+Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables ; `..._pilatelia_v5.sql` : téléphone des clientes + mot de passe admin modifiable — **à appliquer avant de déployer le Worker**, sinon les réservations échouent). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
 
 ## 2. Site (Cloudflare Workers)
 

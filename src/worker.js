@@ -25,11 +25,81 @@ function range(url) {
   return { from, to };
 }
 
-async function isAdmin(request, env) {
+// ---------- Mot de passe admin ----------
+// Le mot de passe modifié depuis l'admin est stocké haché (PBKDF2) dans studio_settings.
+// Tant qu'aucun n'est enregistré, c'est la variable d'env ADMIN_PASSWORD qui fait foi.
+const PBKDF2_ITER = 20000;
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const sha256 = (s) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+
+async function pbkdf2(password, salt, iter) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  return crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, k, 256);
+}
+
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return `pbkdf2$${PBKDF2_ITER}$${b64(salt)}$${b64(await pbkdf2(password, salt, PBKDF2_ITER))}`;
+}
+
+// Cache mémoire des vérifications réussies (évite de recalculer PBKDF2 à chaque appel).
+const verified = new Map(); // stored hash -> empreinte SHA-256 du mot de passe saisi
+
+async function checkPassword(password, stored) {
+  const [, iter, salt, expected] = String(stored).split('$');
+  if (!iter || !salt || !expected) return false;
+  const fp = b64(await sha256(password));
+  if (verified.get(stored) === fp) return true;
+  const got = await pbkdf2(password, unb64(salt), Number(iter));
+  const want = unb64(expected).buffer;
+  const ok = got.byteLength === want.byteLength && crypto.subtle.timingSafeEqual(got, want);
+  if (ok) { verified.clear(); verified.set(stored, fp); }
+  return ok;
+}
+
+async function storedPasswordHash(env) {
+  try {
+    const rows = await db(env, 'studio_settings?select=admin_password_hash&limit=1');
+    return rows?.[0]?.admin_password_hash || null;
+  } catch { return null; } // colonne absente avant migration v5
+}
+
+async function passwordMatches(password, env) {
+  const stored = await storedPasswordHash(env);
+  if (stored) return checkPassword(password, stored);
   if (!env.ADMIN_PASSWORD) return false;
-  const hash = (s) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  const [a, b] = await Promise.all([hash(request.headers.get('x-admin-key') || ''), hash(env.ADMIN_PASSWORD)]);
+  const [a, b] = await Promise.all([sha256(password), sha256(env.ADMIN_PASSWORD)]);
   return crypto.subtle.timingSafeEqual(a, b);
+}
+
+const isAdmin = (request, env) => passwordMatches(request.headers.get('x-admin-key') || '', env);
+
+async function changePassword(request, env) {
+  const { current, next } = await request.json().catch(() => ({}));
+  const pwd = String(next || '');
+  if (!(await passwordMatches(String(current || ''), env))) throw new HttpError(400, 'Mot de passe actuel incorrect.');
+  if (pwd.length < 6 || pwd.length > 200) throw new HttpError(400, 'Le nouveau mot de passe doit faire au moins 6 caractères.');
+  await db(env, 'studio_settings?on_conflict=singleton', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ singleton: true, admin_password_hash: await hashPassword(pwd), updated_at: new Date().toISOString() }),
+  });
+  verified.clear();
+  return json({ ok: true });
+}
+
+// ---------- Téléphone / WhatsApp ----------
+const cleanPhone = (v) => String(v || '').trim().slice(0, 40);
+const validPhone = (v) => /^\+?[\d\s.\-/()]+$/.test(v) && v.replace(/\D/g, '').length >= 8 && v.replace(/\D/g, '').length <= 15;
+// Numéro international pour wa.me (sans +). Numéro national (0…) → Belgique (+32).
+function waNumber(raw) {
+  const v = String(raw || '').trim();
+  const d = v.replace(/\D/g, '');
+  if (!d) return '';
+  if (v.startsWith('+')) return d;
+  if (d.startsWith('00')) return d.slice(2);
+  if (d.startsWith('0')) return `32${d.slice(1)}`;
+  return d;
 }
 
 // ---------- Studio / e-mail ----------
@@ -158,8 +228,11 @@ const slotLine = (slot) =>
   </div>`;
 
 const changeNote = (s) => {
-  const how = [s.email && `par e-mail (${esc(s.email)})`, s.phone && `par téléphone (${esc(s.phone)})`].filter(Boolean).join(' ou ');
-  return `<p style="color:#7b6b56">Vous pouvez modifier ou annuler votre séance depuis l'application jusqu'à 24h avant. En cas de souci, appelez le studio${how ? ` ${how}` : ''}.</p>`;
+  const wa = waNumber(s.phone);
+  const how = s.phone
+    ? ` au ${esc(s.phone)} ou écrivez-nous sur <a href="https://wa.me/${wa}" style="color:#25a55f;font-weight:700">WhatsApp</a>`
+    : '';
+  return `<p style="color:#7b6b56">Vous pouvez modifier ou annuler votre séance depuis l'application jusqu'à 24h avant. En cas de souci, appelez le studio${how}.</p>`;
 };
 
 function confirmationEmail(s, slot, origin) {
@@ -169,6 +242,10 @@ function confirmationEmail(s, slot, origin) {
 function cancellationEmail(s, slot) {
   return { subject: `Réservation annulée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
     html: emailShell(s, 'Réservation annulée', `<p>Votre réservation a été annulée.</p>${slotLine(slot)}<p>À très bientôt pour une prochaine séance.</p>`) };
+}
+function movedEmail(s, slot, oldStart) {
+  return { subject: `Séance déplacée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
+    html: emailShell(s, 'Votre séance a été déplacée', `<p>Le studio a déplacé votre séance initialement prévue ${esc(fmtDate(oldStart))}. Votre place est gardée au nouvel horaire :</p>${slotLine(slot)}${venueLine(s)}${changeNote(s)}`) };
 }
 function reminderEmail(s, slot) {
   return { subject: `Rappel — ${slot.title || 'Pilates'} demain, ${fmtDate(slot.starts_at)}`,
@@ -199,14 +276,16 @@ async function publicSlots(url, env) {
 }
 
 async function book(request, env, ctx) {
-  const { slot_id, name, email } = await request.json().catch(() => ({}));
+  const { slot_id, name, email, phone } = await request.json().catch(() => ({}));
   const cleanName = String(name || '').trim().slice(0, 100);
   const cleanEmail = String(email || '').trim().toLowerCase();
+  const phoneNum = cleanPhone(phone);
   if (!UUID.test(slot_id || '') || !cleanName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
     return json({ error: 'Merci de vérifier votre nom et votre e-mail.' }, 400);
   }
+  if (!validPhone(phoneNum)) return json({ error: 'Merci d’indiquer un numéro de téléphone valide.' }, 400);
   try {
-    const result = await db(env, 'rpc/book_class', { method: 'POST', body: JSON.stringify({ p_class_id: slot_id, p_name: cleanName, p_email: cleanEmail }) });
+    const result = await db(env, 'rpc/book_class', { method: 'POST', body: JSON.stringify({ p_class_id: slot_id, p_name: cleanName, p_email: cleanEmail, p_phone: phoneNum }) });
     const row = Array.isArray(result) ? result[0] : result;
     // Détails de la séance pour l'e-mail + le reçu renvoyé à l'appareil.
     const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes&id=eq.${slot_id}`);
@@ -247,7 +326,7 @@ async function cancelBooking(request, env, ctx) {
   if (!booking) return json({ error: 'Réservation introuvable.' }, 404);
   const slot = booking.classes;
   if (slot && new Date(slot.starts_at).getTime() - Date.now() < DAY) {
-    return json({ error: 'Modification possible en ligne jusqu’à 24h avant la séance. En cas de souci, appelez le studio.' }, 409);
+    return json({ error: 'Modification possible en ligne jusqu’à 24h avant la séance. En cas de souci, appelez le studio ou écrivez-nous sur WhatsApp.' }, 409);
   }
   await db(env, `bookings?id=eq.${id}`, { method: 'DELETE' });
   if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: booking.guest_email, ...cancellationEmail(s, slot) }); })());
@@ -265,7 +344,7 @@ async function flaggedEmails(env) {
 
 async function adminSlots(url, env) {
   const { from, to } = range(url);
-  const slots = await db(env, `classes?select=*,bookings(id,guest_name,guest_email)`
+  const slots = await db(env, `classes?select=*,bookings(id,guest_name,guest_email,guest_phone)`
     + `&starts_at=gte.${encodeURIComponent(from.toISOString())}&starts_at=lt.${encodeURIComponent(to.toISOString())}&order=starts_at`);
   return json({ slots, flagged: await flaggedEmails(env) });
 }
@@ -298,6 +377,62 @@ async function removeSlot(url, env) {
   return json({ ok: true });
 }
 
+// Déplacer / modifier un cours. Les inscrites sont prévenues par e-mail si l'horaire change.
+async function updateSlot(request, env, ctx) {
+  const b = await request.json().catch(() => ({}));
+  if (!UUID.test(b.id || '')) throw new HttpError(400, 'Identifiant invalide.');
+  const [slot] = await db(env, `classes?select=*,bookings(id,guest_email)&id=eq.${b.id}`);
+  if (!slot) throw new HttpError(404, 'Cours introuvable.');
+  const patch = {};
+  if (b.starts_at !== undefined) {
+    const starts = new Date(b.starts_at);
+    if (isNaN(starts)) throw new HttpError(400, 'Date invalide.');
+    if (starts < Date.now()) throw new HttpError(400, 'Impossible de déplacer un cours dans le passé.');
+    patch.starts_at = starts.toISOString();
+  }
+  if (b.duration_minutes !== undefined) {
+    const d = Number(b.duration_minutes);
+    if (!Number.isInteger(d) || d < 10 || d > 240) throw new HttpError(400, 'Durée invalide.');
+    patch.duration_minutes = d;
+  }
+  if (b.capacity !== undefined) {
+    const c = Number(b.capacity);
+    if (!Number.isInteger(c) || c < 1 || c > 100) throw new HttpError(400, 'Nombre de places invalide.');
+    if (c < slot.bookings.length) throw new HttpError(400, `Déjà ${slot.bookings.length} inscrites : impossible de descendre à ${c} places.`);
+    patch.capacity = c;
+  }
+  if (!Object.keys(patch).length) return json({ ok: true });
+  const moved = patch.starts_at && new Date(patch.starts_at).getTime() !== new Date(slot.starts_at).getTime();
+  await db(env, `classes?id=eq.${b.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+  if (moved && slot.bookings.length) {
+    // Le rappel de la veille doit repartir pour le nouvel horaire.
+    await db(env, `bookings?class_id=eq.${b.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ reminder_sent_at: null }) });
+    const updated = { ...slot, ...patch };
+    ctx?.waitUntil?.((async () => {
+      const s = await loadStudio(env);
+      for (const bk of slot.bookings) await sendEmail(env, { to: bk.guest_email, ...movedEmail(s, updated, slot.starts_at) });
+    })());
+  }
+  return json({ ok: true, notified: moved ? slot.bookings.length : 0 });
+}
+
+// Vider une semaine : supprime les cours À VENIR de la période (les cours passés restent
+// pour l'historique et les finances). Les inscrites reçoivent un e-mail d'annulation.
+async function clearSlots(url, env, ctx) {
+  const { from, to } = range(url);
+  const start = new Date(Math.max(from, Date.now())).toISOString();
+  const slots = await db(env, `classes?select=id,title,starts_at,duration_minutes,bookings(guest_email)`
+    + `&starts_at=gte.${encodeURIComponent(start)}&starts_at=lt.${encodeURIComponent(to.toISOString())}`);
+  if (!slots.length) return json({ ok: true, deleted: 0, notified: 0 });
+  await db(env, `classes?id=in.(${slots.map((s) => s.id).join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  const notices = slots.flatMap((s) => s.bookings.map((b) => ({ to: b.guest_email, slot: s })));
+  if (notices.length) ctx?.waitUntil?.((async () => {
+    const s = await loadStudio(env);
+    for (const n of notices) await sendEmail(env, { to: n.to, ...cancellationEmail(s, n.slot) });
+  })());
+  return json({ ok: true, deleted: slots.length, notified: notices.length });
+}
+
 // Retrait d'une réservation par le studio : e-mail d'annulation + flag si < 24h.
 async function removeBooking(url, env, ctx) {
   const id = url.searchParams.get('id');
@@ -323,7 +458,7 @@ async function removeBooking(url, env, ctx) {
 async function report(env) {
   // shortcut: agrège en JS sur toutes les réservations ; passer à une vue SQL au-delà de ~10k réservations.
   const [rows, late] = await Promise.all([
-    db(env, 'bookings?select=guest_name,guest_email,classes(starts_at)&order=created_at'),
+    db(env, 'bookings?select=guest_name,guest_email,guest_phone,classes(starts_at)&order=created_at'),
     flaggedEmails(env),
   ]);
   const now = Date.now();
@@ -331,8 +466,9 @@ async function report(env) {
   for (const r of rows) {
     if (!r.classes) continue;
     const at = new Date(r.classes.starts_at).getTime();
-    const c = clients.get(r.guest_email) || { name: r.guest_name, email: r.guest_email, total: 0, upcoming: 0, first: at, last: null, late: late[r.guest_email] || 0 };
+    const c = clients.get(r.guest_email) || { name: r.guest_name, email: r.guest_email, phone: '', total: 0, upcoming: 0, first: at, last: null, late: late[r.guest_email] || 0 };
     c.name = r.guest_name; // garde le nom le plus récent
+    if (r.guest_phone) c.phone = r.guest_phone; // et le dernier numéro connu
     c.total += 1;
     if (at > now) c.upcoming += 1; else c.last = Math.max(c.last ?? 0, at);
     c.first = Math.min(c.first, at);
@@ -434,17 +570,19 @@ async function saveStudio(request, env) {
 
 // Inscription manuelle d'une personne à un cours (par le studio).
 async function addBooking(request, env, ctx) {
-  const { class_id, name, email } = await request.json().catch(() => ({}));
+  const { class_id, name, email, phone } = await request.json().catch(() => ({}));
   const cleanName = String(name || '').trim().slice(0, 100);
   const cleanEmail = String(email || '').trim().toLowerCase();
+  const phoneNum = cleanPhone(phone);
   if (!UUID.test(class_id || '') || !cleanName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
     throw new HttpError(400, 'Nom ou e-mail invalide.');
   }
+  if (!validPhone(phoneNum)) throw new HttpError(400, 'Numéro de téléphone invalide.');
   const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes,capacity,bookings(count)&id=eq.${class_id}`);
   if (!slot) throw new HttpError(404, 'Cours introuvable.');
   if ((slot.bookings?.[0]?.count ?? 0) >= slot.capacity) throw new HttpError(409, 'Cours complet : retirez une personne d’abord.');
   try {
-    await db(env, 'bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ class_id, guest_name: cleanName, guest_email: cleanEmail }) });
+    await db(env, 'bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ class_id, guest_name: cleanName, guest_email: cleanEmail, guest_phone: phoneNum }) });
   } catch (err) {
     if ((err.detail || '').includes('duplicate')) throw new HttpError(409, 'Cette personne est déjà inscrite à ce cours.');
     throw err;
@@ -458,7 +596,9 @@ async function admin(request, url, env, ctx) {
   const route = `${request.method} ${url.pathname}`;
   if (route === 'GET /api/admin/slots') return adminSlots(url, env);
   if (route === 'POST /api/admin/slots') return createSlots(request, env);
-  if (route === 'DELETE /api/admin/slots') return removeSlot(url, env);
+  if (route === 'PATCH /api/admin/slots') return updateSlot(request, env, ctx);
+  if (route === 'DELETE /api/admin/slots') return url.searchParams.has('id') ? removeSlot(url, env) : clearSlots(url, env, ctx);
+  if (route === 'POST /api/admin/password') return changePassword(request, env);
   if (route === 'POST /api/admin/bookings') return addBooking(request, env, ctx);
   if (route === 'DELETE /api/admin/bookings') return removeBooking(url, env, ctx);
   if (route === 'GET /api/admin/report') return report(env);

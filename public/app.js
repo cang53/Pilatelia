@@ -142,6 +142,7 @@ function openSheet() {
     const saved = JSON.parse(localStorage.getItem('pilatelia-me') || '{}');
     if (!form.name.value) form.name.value = saved.name || '';
     if (!form.email.value) form.email.value = saved.email || '';
+    if (!form.phone.value) form.phone.value = saved.phone || '';
   } catch {}
   sheet.showModal();
 }
@@ -151,7 +152,7 @@ form.addEventListener('submit', async (e) => {
   const btn = form.querySelector('[type=submit]');
   btn.disabled = true;
   $('#formError').textContent = '';
-  const me = { name: form.name.value.trim(), email: form.email.value.trim() };
+  const me = { name: form.name.value.trim(), email: form.email.value.trim(), phone: form.phone.value.trim() };
   try {
     const res = await api('/api/book', { method: 'POST', body: JSON.stringify({ slot_id: chosen.id, ...me }) });
     try { localStorage.setItem('pilatelia-me', JSON.stringify(me)); } catch {}
@@ -195,13 +196,23 @@ async function loadMine() {
   if (slots.length) renderSlots(); // rafraîchit les marqueurs « déjà inscrite »
 }
 
+// Message WhatsApp pré-rempli avec la prochaine séance de l'appareil.
+function waText() {
+  const next = mine.find((m) => new Date(m.slot.starts_at) >= new Date());
+  const hello = 'Bonjour, ';
+  if (!next) return `${hello}j'ai une question concernant une réservation.`;
+  const d = new Date(next.slot.starts_at);
+  return `${hello}c'est ${next.name}, au sujet de ma réservation ${next.slot.title} du ${fmt.day.format(d)} à ${fmt.time.format(d)}.`;
+}
+
 function contactBlock() {
-  const mail = conf.studio_email ? `<a class="btn btn-primary" href="mailto:${esc(conf.studio_email)}?subject=${encodeURIComponent('Ma réservation Pilatelia')}">${ic('mail')} Écrire</a>` : '';
-  const tel = conf.studio_phone ? `<a class="btn btn-secondary" href="tel:${esc(conf.studio_phone.replace(/\s/g, ''))}">${ic('phone')} Appeler</a>` : '';
+  const wa = conf.studio_phone ? `<a class="btn btn-wa" href="${esc(waLink(conf.studio_phone, waText()))}" target="_blank" rel="noopener">${ic('whatsapp')} WhatsApp</a>` : '';
+  const tel = conf.studio_phone ? `<a class="btn btn-secondary" href="${esc(telLink(conf.studio_phone))}">${ic('phone')} Appeler</a>` : '';
+  const mail = !conf.studio_phone && conf.studio_email ? `<a class="btn btn-primary" href="mailto:${esc(conf.studio_email)}?subject=${encodeURIComponent('Ma réservation Pilatelia')}">${ic('mail')} Écrire</a>` : '';
   return `<div class="card">
     <h2 style="font-size:16px;margin-bottom:4px">Un souci ?</h2>
-    <p class="muted small" style="margin:0 0 14px">En cas de souci, appelez le studio.</p>
-    <div class="actions-2">${mail}${tel}</div>
+    <p class="muted small" style="margin:0 0 14px">Appelez le studio ou envoyez-nous un message WhatsApp.</p>
+    <div class="actions-2">${wa}${tel}${mail}</div>
     ${conf.studio_address ? `<div class="lock" style="color:var(--ink-muted)">${ic('info')} ${esc(conf.studio_address)}</div>` : ''}
   </div>`;
 }
@@ -237,7 +248,7 @@ function renderMine() {
             <button class="btn btn-secondary" data-move="${m.id}">${ic('repeat')} Déplacer</button>
             <button class="btn btn-ghost" data-cancel="${m.id}">${ic('trash')} Annuler</button>
           </div>`
-        : `<div class="lock">${ic('info')} En cas de souci, appelez le studio.</div>`}
+        : `<div class="lock">${ic('info')} Moins de 24h avant : appelez le studio ou écrivez-nous sur WhatsApp.</div>`}
     </div>`;
   };
   $('#mine').innerHTML = upcoming.map(card).join('')
