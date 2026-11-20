@@ -33,8 +33,8 @@ const upcomingCount = () => mine.filter((m) => new Date(m.slot.starts_at) > new 
 function renderCount() {
   const n = upcomingCount();
   for (const el of [$('#count1'), $('#count2')]) {
-    el.hidden = false;
-    el.innerHTML = `${ic('check')} ${n} / 3`;
+    el.hidden = n === 0;
+    el.innerHTML = `${ic('check')} ${n} à venir`;
   }
 }
 
@@ -127,7 +127,6 @@ $('#slots').addEventListener('click', (e) => {
   const b = e.target.closest('[data-id]');
   if (!b) return;
   if (bookedSlotIds().has(b.dataset.id)) { switchView('mine'); return; }
-  if (upcomingCount() >= 3) { toast('3 réservations maximum sur cet appareil. Annulez-en une pour réserver.'); return; }
   chosen = slots.find((s) => s.id === b.dataset.id);
   openSheet();
 });
@@ -217,12 +216,30 @@ function contactBlock() {
   </div>`;
 }
 
+// « Retrouver mes réservations » : utile quand la cliente a réservé depuis un autre
+// navigateur (ex. le navigateur intégré d'Instagram) qui ne partage pas sa mémoire.
+function recoverBlock(open) {
+  let email = '';
+  try { email = JSON.parse(localStorage.getItem('pilatelia-me') || '{}').email || ''; } catch {}
+  return `<div class="card recover" style="margin-bottom:12px">
+    <h2 style="font-size:16px;margin-bottom:4px">${open ? 'Vous avez déjà réservé ?' : 'Il manque une réservation ?'}</h2>
+    <p class="muted small" style="margin:0 0 12px">Si vous avez réservé depuis Instagram ou un autre téléphone, elle n'apparaît pas ici.
+      Indiquez votre e-mail : on vous envoie un lien pour la retrouver. Vous pouvez aussi appuyer sur
+      « Modifier ou annuler ma réservation » dans l'e-mail de confirmation.</p>
+    <form id="recoverForm" class="recover-form">
+      <input name="email" type="email" autocomplete="email" required placeholder="votre@email.com" value="${esc(email)}" aria-label="Votre e-mail" />
+      <button class="btn btn-secondary" type="submit">${ic('mail')} Recevoir le lien</button>
+    </form>
+  </div>`;
+}
+
 function renderMine() {
   const now = new Date();
   const upcoming = mine.filter((m) => new Date(m.slot.starts_at) >= now);
   const past = mine.filter((m) => new Date(m.slot.starts_at) < now);
   if (!upcoming.length) {
-    $('#mine').innerHTML = `<div class="empty">Aucune réservation en cours.<br>Rendez-vous dans « Réserver » pour choisir une séance.</div>
+    $('#mine').innerHTML = `<div class="empty">Aucune réservation sur ce navigateur.<br>Rendez-vous dans « Réserver » pour choisir une séance.</div>
+      ${recoverBlock(true)}
       ${(conf.studio_email || conf.studio_phone) ? contactBlock() : ''}`;
     return;
   }
@@ -252,6 +269,7 @@ function renderMine() {
     </div>`;
   };
   $('#mine').innerHTML = upcoming.map(card).join('')
+    + recoverBlock(false)
     + contactBlock()
     + (past.length ? `<p class="subh" style="margin-top:18px">Déjà passées</p>${past.map((m) => {
         const d = new Date(m.slot.starts_at);
@@ -267,6 +285,19 @@ async function cancelReservation(id) {
     return true;
   } catch (err) { toast(err.message); return false; }
 }
+
+$('#mine').addEventListener('submit', async (e) => {
+  if (e.target.id !== 'recoverForm') return;
+  e.preventDefault();
+  const f = e.target;
+  const btn = f.querySelector('[type=submit]');
+  btn.disabled = true;
+  try {
+    await api('/api/recover', { method: 'POST', body: JSON.stringify({ email: f.email.value.trim() }) });
+    toast('Si des réservations existent pour cet e-mail, un lien vient de partir. Pensez aux spams.');
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+});
 
 $('#mine').addEventListener('click', async (e) => {
   const cancelBtn = e.target.closest('[data-cancel]');
@@ -309,7 +340,20 @@ $('#next').addEventListener('click', () => { week = addDays(week, 7); selectedDa
 
 // ---------- Démarrage ----------
 // On ouvre sur la semaine la plus proche qui contient une séance (sinon la semaine courante).
+// Lien reçu par e-mail (/?r=id1,id2) : rattache ces réservations à CE navigateur
+// et ouvre « Ma réservation ».
+function importFromLink() {
+  const params = new URLSearchParams(location.search);
+  const ids = (params.get('r') || '').split(',').filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (!params.has('r')) return false;
+  if (ids.length) saveMyIds([...myIds(), ...ids]);
+  params.delete('r');
+  history.replaceState(null, '', location.pathname + (params.toString() ? `?${params}` : '') + location.hash);
+  return ids.length > 0;
+}
+
 async function start() {
+  if (importFromLink()) switchView('mine');
   api('/api/config').then((c) => { conf = c; }).catch(() => {}).finally(loadMine);
   week = thisWeek;
   selectedDay = ymd(new Date());

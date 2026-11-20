@@ -227,29 +227,48 @@ const slotLine = (slot) =>
     <div style="color:#7b6b56;margin-top:4px">${esc(fmtDate(slot.starts_at))} · ${slot.duration_minutes} min</div>
   </div>`;
 
-const changeNote = (s) => {
+// Adresse du site : SITE_URL (utile pour le cron, qui n'a pas de requête), sinon l'origine de la requête.
+const siteUrl = (env, request) => (env.SITE_URL || (request ? new URL(request.url).origin : '')).replace(/\/+$/, '');
+
+// Lien « magique » : ouvre le site sur « Ma réservation » et rattache la/les réservation(s)
+// au navigateur qui l'ouvre (utile quand la cliente a réservé depuis Instagram, dont le
+// navigateur intégré ne partage pas sa mémoire avec Safari / Chrome).
+const manageUrl = (origin, ids) => `${origin}/?r=${[].concat(ids).join(',')}`;
+const manageButton = (origin, ids, label = 'Modifier ou annuler ma réservation') => (origin && ids && [].concat(ids).length)
+  ? `<div style="margin:18px 0 6px;text-align:center">
+      <a href="${esc(manageUrl(origin, ids))}" style="display:inline-block;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:999px;background:#6e4d32;color:#fdf7ec">✏️ ${esc(label)}</a>
+    </div>`
+  : '';
+
+const changeNote = (s, canManage) => {
   const wa = waNumber(s.phone);
   const how = s.phone
     ? ` au ${esc(s.phone)} ou écrivez-nous sur <a href="https://wa.me/${wa}" style="color:#25a55f;font-weight:700">WhatsApp</a>`
     : '';
-  return `<p style="color:#7b6b56">Vous pouvez modifier ou annuler votre séance depuis l'application jusqu'à 24h avant. En cas de souci, appelez le studio${how}.</p>`;
+  const where = canManage ? 'avec le bouton ci-dessus' : 'depuis le site';
+  return `<p style="color:#7b6b56">Vous pouvez modifier ou annuler votre séance ${where} jusqu'à 24h avant. En cas de souci, appelez le studio${how}.</p>`;
 };
 
-function confirmationEmail(s, slot, origin) {
+function confirmationEmail(s, slot, origin, id) {
   return { subject: `C'est réservé — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
-    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${calendarButtons(s, slot, origin)}${venueLine(s)}${changeNote(s)}`) };
+    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${calendarButtons(s, slot, origin)}${venueLine(s)}${manageButton(origin, id)}${changeNote(s, !!(origin && id))}`) };
 }
 function cancellationEmail(s, slot) {
   return { subject: `Réservation annulée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
     html: emailShell(s, 'Réservation annulée', `<p>Votre réservation a été annulée.</p>${slotLine(slot)}<p>À très bientôt pour une prochaine séance.</p>`) };
 }
-function movedEmail(s, slot, oldStart) {
+function movedEmail(s, slot, oldStart, origin, id) {
   return { subject: `Séance déplacée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
-    html: emailShell(s, 'Votre séance a été déplacée', `<p>Le studio a déplacé votre séance initialement prévue ${esc(fmtDate(oldStart))}. Votre place est gardée au nouvel horaire :</p>${slotLine(slot)}${venueLine(s)}${changeNote(s)}`) };
+    html: emailShell(s, 'Votre séance a été déplacée', `<p>Le studio a déplacé votre séance initialement prévue ${esc(fmtDate(oldStart))}. Votre place est gardée au nouvel horaire :</p>${slotLine(slot)}${venueLine(s)}${manageButton(origin, id)}${changeNote(s, !!(origin && id))}`) };
 }
-function reminderEmail(s, slot) {
+function reminderEmail(s, slot, origin, id) {
   return { subject: `Rappel — ${slot.title || 'Pilates'} demain, ${fmtDate(slot.starts_at)}`,
-    html: emailShell(s, 'C\'est pour demain', `<p>Petit rappel de votre séance :</p>${slotLine(slot)}${venueLine(s)}<p>Pensez à une tenue confortable. À demain !</p>`) };
+    html: emailShell(s, 'C\'est pour demain', `<p>Petit rappel de votre séance :</p>${slotLine(slot)}${venueLine(s)}<p>Pensez à une tenue confortable. À demain !</p>${manageButton(origin, id, 'Voir ma réservation')}`) };
+}
+function recoverEmail(s, rows, origin) {
+  const list = rows.map((r) => slotLine(r.classes)).join('');
+  return { subject: `Vos réservations — ${s.name || 'Pilatelia'}`,
+    html: emailShell(s, 'Vos réservations', `<p>Voici vos séances à venir. Appuyez sur le bouton pour les retrouver sur ce téléphone et les modifier si besoin.</p>${list}${manageButton(origin, rows.map((r) => r.id), 'Voir mes réservations')}${changeNote(s, true)}`) };
 }
 
 // ---------- Public ----------
@@ -289,12 +308,11 @@ async function book(request, env, ctx) {
     const row = Array.isArray(result) ? result[0] : result;
     // Détails de la séance pour l'e-mail + le reçu renvoyé à l'appareil.
     const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes&id=eq.${slot_id}`);
-    const origin = new URL(request.url).origin;
-    if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot, origin) }); })());
+    const origin = siteUrl(env, request);
+    if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot, origin, row?.id) }); })());
     return json({ ok: true, id: row?.id, slot }, 201);
   } catch (err) {
     const d = err.detail || '';
-    if (d.includes('LIMITE')) return json({ error: 'Vous avez déjà 3 réservations à venir sur cet appareil. Annulez-en une pour réserver.' }, 409);
     if (d.includes('COMPLET')) return json({ error: 'Ce créneau vient d’être complet.' }, 409);
     if (d.includes('duplicate')) return json({ error: 'Vous êtes déjà inscrite à ce créneau.' }, 409);
     if (d.includes('INTROUVABLE')) return json({ error: 'Ce créneau n’est plus disponible.' }, 404);
@@ -314,6 +332,21 @@ async function myBookings(request, env) {
     .map((r) => ({ id: r.id, name: r.guest_name, email: r.guest_email, slot: r.classes }))
     .sort((a, b) => new Date(a.slot.starts_at) - new Date(b.slot.starts_at));
   return json(out);
+}
+
+// « Retrouver mes réservations » : la cliente saisit son e-mail, on lui envoie un lien
+// qui rattache ses séances à venir au navigateur qui l'ouvre. Réponse toujours identique
+// (on ne révèle pas si l'e-mail a des réservations).
+async function recoverBookings(request, env, ctx) {
+  const { email } = await request.json().catch(() => ({}));
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) return json({ error: 'Merci de vérifier votre e-mail.' }, 400);
+  const rows = await db(env, `bookings?select=id,classes!inner(title,starts_at,duration_minutes)`
+    + `&guest_email=eq.${encodeURIComponent(cleanEmail)}&classes.starts_at=gte.${encodeURIComponent(new Date().toISOString())}`);
+  rows.sort((a, b) => new Date(a.classes.starts_at) - new Date(b.classes.starts_at));
+  const origin = siteUrl(env, request);
+  if (rows.length) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...recoverEmail(s, rows.slice(0, 40), origin) }); })());
+  return json({ ok: true });
 }
 
 // Annulation / déplacement en autonomie depuis l'appareil : autorisé seulement
@@ -382,6 +415,7 @@ async function updateSlot(request, env, ctx) {
   const b = await request.json().catch(() => ({}));
   if (!UUID.test(b.id || '')) throw new HttpError(400, 'Identifiant invalide.');
   const [slot] = await db(env, `classes?select=*,bookings(id,guest_email)&id=eq.${b.id}`);
+  const origin = siteUrl(env, request);
   if (!slot) throw new HttpError(404, 'Cours introuvable.');
   const patch = {};
   if (b.starts_at !== undefined) {
@@ -410,7 +444,7 @@ async function updateSlot(request, env, ctx) {
     const updated = { ...slot, ...patch };
     ctx?.waitUntil?.((async () => {
       const s = await loadStudio(env);
-      for (const bk of slot.bookings) await sendEmail(env, { to: bk.guest_email, ...movedEmail(s, updated, slot.starts_at) });
+      for (const bk of slot.bookings) await sendEmail(env, { to: bk.guest_email, ...movedEmail(s, updated, slot.starts_at, origin, bk.id) });
     })());
   }
   return json({ ok: true, notified: moved ? slot.bookings.length : 0 });
@@ -599,13 +633,15 @@ async function addBooking(request, env, ctx) {
   const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes,capacity,bookings(count)&id=eq.${class_id}`);
   if (!slot) throw new HttpError(404, 'Cours introuvable.');
   if ((slot.bookings?.[0]?.count ?? 0) >= slot.capacity) throw new HttpError(409, 'Cours complet : retirez une personne d’abord.');
+  let created;
   try {
-    await db(env, 'bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ class_id, guest_name: cleanName, guest_email: cleanEmail, guest_phone: phoneNum }) });
+    [created] = await db(env, 'bookings', { method: 'POST', body: JSON.stringify({ class_id, guest_name: cleanName, guest_email: cleanEmail, guest_phone: phoneNum }) });
   } catch (err) {
     if ((err.detail || '').includes('duplicate')) throw new HttpError(409, 'Cette personne est déjà inscrite à ce cours.');
     throw err;
   }
-  ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot) }); })());
+  const origin = siteUrl(env, request);
+  ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: cleanEmail, ...confirmationEmail(s, slot, origin, created?.id) }); })());
   return json({ ok: true }, 201);
 }
 
@@ -641,8 +677,9 @@ async function sendReminders(env, ctx) {
     + `&reminder_sent_at=is.null&classes.starts_at=gte.${encodeURIComponent(fromIso)}&classes.starts_at=lt.${encodeURIComponent(toIso)}`);
   if (!rows.length) return;
   const s = await loadStudio(env);
+  const origin = siteUrl(env); // pas de requête dans le cron : bouton seulement si SITE_URL est défini
   for (const r of rows) {
-    await sendEmail(env, { to: r.guest_email, ...reminderEmail(s, r.classes) });
+    await sendEmail(env, { to: r.guest_email, ...reminderEmail(s, r.classes, origin, r.id) });
   }
   const ids = rows.map((r) => r.id);
   await db(env, `bookings?id=in.(${ids.join(',')})`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ reminder_sent_at: new Date().toISOString() }) });
@@ -664,6 +701,7 @@ export default {
       if (url.pathname === '/api/book' && request.method === 'POST') return await book(request, env, ctx);
       if (url.pathname === '/api/my' && request.method === 'POST') return await myBookings(request, env);
       if (url.pathname === '/api/cancel' && request.method === 'POST') return await cancelBooking(request, env, ctx);
+      if (url.pathname === '/api/recover' && request.method === 'POST') return await recoverBookings(request, env, ctx);
       if (url.pathname.startsWith('/api/admin/')) return await admin(request, url, env, ctx);
       if (url.pathname.startsWith('/api/')) return json({ error: 'Introuvable.' }, 404);
     } catch (err) {

@@ -2,7 +2,7 @@
 
 Studio réservé aux femmes. Interface mobile, thème clair, **sans compte** : la cliente réserve en 2–3 taps, reçoit un e-mail de confirmation (boutons Google Agenda / Apple Calendar, + rappel la veille), et peut déplacer ou annuler sa séance en ligne jusqu'à 24h avant.
 
-- **`/`** — Réserver : s'ouvre sur la semaine la plus proche qui a une séance ; sélection du jour, réservation (nom + e-mail + **téléphone obligatoire**). Une séance déjà réservée depuis l'appareil s'affiche « Déjà inscrite » et renvoie vers sa gestion. Onglet **Ma réservation** : les réservations de l'appareil (3 max), boutons **Déplacer / Annuler** à plus de 24h, sinon « appelez le studio ou écrivez sur WhatsApp ». Bloc contact : boutons **WhatsApp** (ouvre directement la conversation avec un message pré-rempli) et **Appeler**. Icône cadenas en haut à droite → espace studio.
+- **`/`** — Réserver : s'ouvre sur la semaine la plus proche qui a une séance ; sélection du jour, réservation (nom + e-mail + **téléphone obligatoire**). Une séance déjà réservée depuis l'appareil s'affiche « Déjà inscrite » et renvoie vers sa gestion. Onglet **Ma réservation** : les réservations du navigateur (sans limite), boutons **Déplacer / Annuler** à plus de 24h, sinon « appelez le studio ou écrivez sur WhatsApp ». Bloc **« Retrouver mes réservations »** : la cliente saisit son e-mail et reçoit un lien qui rattache ses séances à venir au navigateur qui l'ouvre (cas d'une réservation faite depuis le navigateur intégré d'Instagram, qui ne partage pas sa mémoire avec Safari / Chrome). Bloc contact : boutons **WhatsApp** (ouvre directement la conversation avec un message pré-rempli) et **Appeler**. Icône cadenas en haut à droite → espace studio.
 - **`/admin.html`** — Espace studio (gros caractères, utilisable aussi sur ordinateur) :
   - **Agenda** — vraie grille semaine (jours × heures, créneaux vides visibles). Un créneau s'ouvre pour voir les inscrites, retirer une réservation (e-mail d'annulation), **flag « annulation < 24h »**, **déplacer / modifier le cours** (jour, heure, durée, places — les inscrites reçoivent un e-mail avec le nouvel horaire). Téléphone + lien WhatsApp de chaque inscrite. Ajout de cours **à n'importe quelle date** (plus de limite d'une semaine), avec répétition hebdo et copie de la semaine précédente, **« Vider la semaine »** (supprime les cours à venir de la semaine, prévient les inscrites ; les cours passés restent pour les finances) et **export story Instagram « Nos Horaires »** (1080×1920, reprend l'affiche du studio : arche lumineuse, jours en colonnes, heures alignées, adresse / Instagram / WhatsApp en pied ; bouton **« Utiliser mon fond »** pour importer son propre visuel sans texte, recadré en 9:16 et gardé en base).
   - **Prestations** — catalogue des activités avec **tarif**, durée, places ; sélectionnable à l'ajout d'un cours. Le tarif s'affiche côté cliente.
@@ -16,7 +16,7 @@ Un seul Cloudflare Worker sert le site et l'API ; la clé Supabase et le mot de 
 
 ### Règles métier
 
-- **Sans compte** : réservations liées à l'appareil (ids en `localStorage`), **3 à venir maximum** — limite aussi appliquée côté serveur par e-mail.
+- **Sans compte** : réservations liées au navigateur (ids en `localStorage`), **sans limite** de réservations à venir (une seule place par séance). Les e-mails (confirmation, déplacement, rappel) contiennent un bouton **« Modifier ou annuler ma réservation »** qui ouvre le site sur `/?r=<id>` et rattache la réservation au navigateur qui l'ouvre.
 - **Modification/annulation** : en ligne par la cliente jusqu'à 24h avant (`POST /api/cancel`, règle vérifiée côté serveur) ; en deçà, via le studio. Une annulation faite par le studio à moins de 24h **flague** la cliente.
 - **E-mails** : confirmation à la réservation (avec ajout à l'agenda via `/api/ics`), annulation, rappel la veille (cron horaire). Envoyés en HTML + texte.
 
@@ -28,7 +28,7 @@ npx supabase link --project-ref rhwpgcnqztrtymhoqsev
 npx supabase db push
 ```
 
-Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables ; `..._pilatelia_v5.sql` : téléphone des clientes + mot de passe admin modifiable — **à appliquer avant de déployer le Worker**, sinon les réservations échouent). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
+Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables ; `..._pilatelia_v5.sql` : téléphone des clientes + mot de passe admin modifiable ; `..._pilatelia_v6.sql` : suppression de la limite de 3 réservations — **à appliquer avant de déployer le Worker**, sinon les réservations échouent). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
 
 ## 2. Site (Cloudflare Workers)
 
@@ -46,6 +46,7 @@ npx wrangler secret put STUDIO_EMAIL          # contact affiché aux clientes
 npx wrangler secret put STUDIO_PHONE          # contact affiché aux clientes
 npx wrangler secret put STUDIO_ADDRESS        # adresse (affichée aux clientes + e-mails) — modifiable dans l'admin
 npx wrangler secret put STUDIO_INSTAGRAM      # @pseudo ou URL (bouton "Abonnements")
+npx wrangler secret put SITE_URL              # https://adresse-du-site (bouton « Voir ma réservation » dans le rappel de la veille)
 npm run deploy
 ```
 

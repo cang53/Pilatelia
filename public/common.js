@@ -80,5 +80,5 @@ const telLink = (phone) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 // Réservations gardées sur CET appareil (sans compte).
 const MINE_KEY = 'pilatelia-bookings';
 const myIds = () => { try { return JSON.parse(localStorage.getItem(MINE_KEY) || '[]'); } catch { return []; } };
-const saveMyIds = (ids) => { try { localStorage.setItem(MINE_KEY, JSON.stringify([...new Set(ids)].slice(-20))); } catch {} };
+const saveMyIds = (ids) => { try { localStorage.setItem(MINE_KEY, JSON.stringify([...new Set(ids)].slice(-50))); } catch {} };
 const addMyId = (id) => saveMyIds([...myIds(), id]);
