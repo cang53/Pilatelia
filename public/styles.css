@@ -39,7 +39,7 @@ svg.ic { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round;
 .small { font-size:13px; }
 .center { text-align:center; }
 
-/* Compteur x/3 */
+/* Compteur de réservations à venir */
 .count { display:inline-flex; align-items:center; gap:6px; background:var(--brand-tint); color:var(--brand-strong);
   font-size:12px; font-weight:700; padding:6px 11px; border-radius:var(--radius-pill); white-space:nowrap; }
 .count svg { width:14px; height:14px; }
@@ -313,3 +313,7 @@ td.num, th.num { text-align:right; }
 }
 
 [hidden] { display:none !important; }
+
+/* Retrouver mes réservations (autre navigateur / Instagram) */
+.recover-form { display:flex; flex-direction:column; gap:10px; }
+.recover-form input { margin-top:0; }
