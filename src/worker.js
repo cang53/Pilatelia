@@ -217,6 +217,8 @@ function emailShell(s, title, bodyHtml) {
     </div>
   </div>`;
 }
+const payLine = `<div style="background:#e6ecd9;border-radius:16px;padding:14px 16px;margin:14px 0;font-size:14px"><b>💳 Paiement sur place</b><br>Rien à payer en ligne : vous réglez au studio, le jour de la séance.</div>`;
+
 const venueLine = (s) => s.address
   ? `<div style="background:#e6ecd9;border-radius:16px;padding:14px 16px;margin:14px 0;font-size:14px"><b>Adresse</b><br>${esc(s.address)}</div>`
   : '';
@@ -251,7 +253,7 @@ const changeNote = (s, canManage) => {
 
 function confirmationEmail(s, slot, origin, id) {
   return { subject: `C'est réservé — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,
-    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${calendarButtons(s, slot, origin)}${venueLine(s)}${manageButton(origin, id)}${changeNote(s, !!(origin && id))}`) };
+    html: emailShell(s, 'C\'est réservé !', `<p>Votre place est gardée. On a hâte de vous voir au studio.</p>${slotLine(slot)}${payLine}${calendarButtons(s, slot, origin)}${venueLine(s)}${manageButton(origin, id)}${changeNote(s, !!(origin && id))}`) };
 }
 function cancellationEmail(s, slot) {
   return { subject: `Réservation annulée — ${slot.title || 'Pilates'}, ${fmtDate(slot.starts_at)}`,

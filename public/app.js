@@ -16,6 +16,7 @@ $('#next').innerHTML = ic('chevronR');
 $('#tabBookIc').innerHTML = ic('calendar');
 $('#tabMineIc').innerHTML = ic('checkCircle');
 $('#noteIc').innerHTML = ic('user');
+$('#payIc').innerHTML = ic('card');
 $('#doneIc').innerHTML = ic('check');
 document.querySelectorAll('.studio-access').forEach((el) => { el.innerHTML = ic('lock'); });
 
@@ -90,10 +91,13 @@ function renderSlots() {
   const d = new Date(`${selectedDay}T12:00`);
   const booked = bookedSlotIds();
   const body = items.length
-    ? `<p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p><div class="list">${items.map((s) => slotCard(s, booked.has(s.id))).join('')}</div>`
+    ? `<div class="subh-row"><p class="subh">${fmt.day.format(d)} — ${plural(items.length, 'séance')}</p>${payPill()}</div><div class="list">${items.map((s) => slotCard(s, booked.has(s.id))).join('')}</div>`
     : `<p class="subh">${fmt.day.format(d)}</p><p class="empty">Aucune séance ce jour-là.<br>Choisissez un autre jour.</p>`;
   $('#slots').innerHTML = body + subscribeCard();
 }
+
+// Pas de paiement en ligne : on le dit clairement, à côté du jour.
+const payPill = () => `<span class="pay-pill">${ic('card')} Paiement sur place</span>`;
 
 function slotCard(s, isBooked) {
   const left = s.capacity - s.booked;
@@ -175,6 +179,7 @@ function showDone() {
       <div class="muted small">${fmt.time.format(d)} · ${s.duration_minutes} min${s.coach ? ` · avec ${esc(s.coach)}` : ''}</div></div>
     </div>
     ${conf.studio_address ? `<div class="perf" style="background:var(--sage-tint)">${ic('info')}<p><strong>Adresse</strong><br>${esc(conf.studio_address)}</p></div>` : ''}
+    <div class="perf" style="background:var(--sage-tint)">${ic('card')}<p><strong>Paiement sur place</strong><br>Rien à payer en ligne : vous réglez au studio, le jour de la séance.</p></div>
     <div class="perf">${ic('mail')}<p>Un <strong>e-mail de confirmation</strong> vient de partir. Rappel la veille.</p></div>
     <div class="perf" style="background:var(--surface-200)">${ic('info')}<p><strong>Pensez à vérifier vos spams</strong> (courriers indésirables) si vous ne voyez pas l'e-mail, et ajoutez-nous à vos contacts pour le recevoir à l'avenir.</p></div>`;
   $('#bookStep').hidden = true;
