@@ -29,6 +29,7 @@
         <button data-tab="prestations">Prestations</button>
         <button data-tab="finances">Finances</button>
         <button data-tab="clients">Clientes</button>
+        <button data-tab="journal">Journal</button>
         <button data-tab="studio">Studio</button>
       </div>
 
@@ -88,6 +89,12 @@
           </div>
           <div class="table-wrap"><table id="clientTable"></table></div>
         </div>
+      </section>
+
+      <!-- Journal des suppressions -->
+      <section id="journal" hidden>
+        <p class="repeat"><span id="journalIc"></span><span>Les réservations supprimées (par le studio, par une cliente ou avec un cours) restent ici <strong>7 jours</strong> : vous pouvez les restaurer en un clic. Ensuite, elles sont effacées.</span></p>
+        <div id="journalList" aria-live="polite"></div>
       </section>
 
       <!-- Studio -->

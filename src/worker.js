@@ -18,6 +18,12 @@ async function db(env, path, init = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// Suppressions via les fonctions SQL v7 : la réservation part dans la corbeille
+// (deleted_bookings, 7 jours) avec le motif affiché dans le journal de l'admin.
+const deleteBookingRow = (env, id, reason) => db(env, 'rpc/delete_booking', { method: 'POST', body: JSON.stringify({ p_id: id, p_reason: reason }) });
+const deleteClassRows = (env, ids, reason) => db(env, 'rpc/delete_classes', { method: 'POST', body: JSON.stringify({ p_ids: ids, p_reason: reason }) });
+const KEEP_DELETED_DAYS = 7;
+
 function range(url) {
   const from = new Date(url.searchParams.get('from'));
   const to = new Date(url.searchParams.get('to'));
@@ -363,7 +369,7 @@ async function cancelBooking(request, env, ctx) {
   if (slot && new Date(slot.starts_at).getTime() - Date.now() < DAY) {
     return json({ error: 'Modification possible en ligne jusqu’à 24h avant la séance. En cas de souci, appelez le studio ou écrivez-nous sur WhatsApp.' }, 409);
   }
-  await db(env, `bookings?id=eq.${id}`, { method: 'DELETE' });
+  await deleteBookingRow(env, id, 'Annulée par la cliente');
   if (slot) ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: booking.guest_email, ...cancellationEmail(s, slot) }); })());
   return json({ ok: true });
 }
@@ -408,7 +414,7 @@ async function createSlots(request, env) {
 async function removeSlot(url, env) {
   const id = url.searchParams.get('id');
   if (!UUID.test(id || '')) throw new HttpError(400, 'Identifiant invalide.');
-  await db(env, `classes?id=eq.${id}`, { method: 'DELETE' });
+  await deleteClassRows(env, [id], 'Cours supprimé par le studio');
   return json({ ok: true });
 }
 
@@ -460,7 +466,7 @@ async function clearSlots(url, env, ctx) {
   const slots = await db(env, `classes?select=id,title,starts_at,duration_minutes,bookings(guest_email)`
     + `&starts_at=gte.${encodeURIComponent(start)}&starts_at=lt.${encodeURIComponent(to.toISOString())}`);
   if (!slots.length) return json({ ok: true, deleted: 0, notified: 0 });
-  await db(env, `classes?id=in.(${slots.map((s) => s.id).join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  await deleteClassRows(env, slots.map((s) => s.id), 'Semaine vidée par le studio');
   const notices = slots.flatMap((s) => s.bookings.map((b) => ({ to: b.guest_email, slot: s })));
   if (notices.length) ctx?.waitUntil?.((async () => {
     const s = await loadStudio(env);
@@ -473,9 +479,9 @@ async function clearSlots(url, env, ctx) {
 async function removeBooking(url, env, ctx) {
   const id = url.searchParams.get('id');
   if (!UUID.test(id || '')) throw new HttpError(400, 'Identifiant invalide.');
-  const rows = await db(env, `bookings?select=id,guest_name,guest_email,classes(id,title,starts_at,duration_minutes)&id=eq.${id}`);
+  const rows = await db(env, `bookings?select=id,guest_name,guest_email,guest_phone,classes(id,title,starts_at,duration_minutes)&id=eq.${id}`);
   const booking = rows[0];
-  await db(env, `bookings?id=eq.${id}`, { method: 'DELETE' });
+  await deleteBookingRow(env, id, 'Retirée par le studio');
   let late = false;
   if (booking?.classes) {
     const slot = booking.classes;
@@ -483,7 +489,7 @@ async function removeBooking(url, env, ctx) {
     late = startsAt > Date.now() && startsAt - Date.now() < DAY;
     if (late) {
       ctx?.waitUntil?.(db(env, 'late_cancellations', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-        class_id: slot.id, guest_email: booking.guest_email, guest_name: booking.guest_name, starts_at: slot.starts_at,
+        class_id: slot.id, guest_email: booking.guest_email, guest_name: booking.guest_name, guest_phone: booking.guest_phone || null, starts_at: slot.starts_at,
       }) }).catch((e) => console.error('late flag', e)));
     }
     ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: booking.guest_email, ...cancellationEmail(s, slot) }); })());
@@ -647,6 +653,50 @@ async function addBooking(request, env, ctx) {
   return json({ ok: true }, 201);
 }
 
+// ---------- Journal des suppressions (corbeille 7 jours) ----------
+
+async function deletedLog(env) {
+  const since = new Date(Date.now() - KEEP_DELETED_DAYS * DAY).toISOString();
+  const rows = await db(env, `deleted_bookings?select=*&deleted_at=gte.${encodeURIComponent(since)}&order=deleted_at.desc&limit=300`);
+  const ids = [...new Set(rows.map((r) => r.class_id).filter(Boolean))];
+  const alive = ids.length ? await db(env, `classes?select=id,capacity,bookings(count)&id=in.(${ids.join(',')})`) : [];
+  const byId = new Map(alive.map((c) => [c.id, c]));
+  return json({ keep_days: KEEP_DELETED_DAYS, items: rows.map((r) => {
+    const c = byId.get(r.class_id);
+    return { ...r, class_exists: !!c, class_full: !!c && (c.bookings?.[0]?.count ?? 0) >= c.capacity };
+  }) });
+}
+
+async function restoreBooking(request, env, ctx) {
+  const { id } = await request.json().catch(() => ({}));
+  if (!UUID.test(id || '')) throw new HttpError(400, 'Identifiant invalide.');
+  let row;
+  try {
+    row = await db(env, 'rpc/restore_booking', { method: 'POST', body: JSON.stringify({ p_id: id }) });
+  } catch (err) {
+    const d = err.detail || '';
+    if (d.includes('INTROUVABLE')) throw new HttpError(404, 'Cette réservation n’est plus dans la corbeille.');
+    if (d.includes('COURS_SUPPRIME')) throw new HttpError(409, 'Le cours a été supprimé : recréez-le dans l’agenda puis inscrivez la cliente.');
+    if (d.includes('DEJA_INSCRITE')) throw new HttpError(409, 'Cette cliente est déjà réinscrite à ce cours.');
+    if (d.includes('COMPLET')) throw new HttpError(409, 'Le cours est complet : libérez une place d’abord.');
+    throw err;
+  }
+  const booking = Array.isArray(row) ? row[0] : row;
+  const [slot] = await db(env, `classes?select=id,title,coach,starts_at,duration_minutes&id=eq.${booking.class_id}`);
+  // Elle a reçu un e-mail d'annulation : on lui renvoie la confirmation (si le cours est à venir).
+  const notify = slot && new Date(slot.starts_at) > Date.now();
+  if (notify) {
+    const origin = siteUrl(env, request);
+    ctx?.waitUntil?.((async () => { const s = await loadStudio(env); await sendEmail(env, { to: booking.guest_email, ...confirmationEmail(s, slot, origin, booking.id) }); })());
+  }
+  return json({ ok: true, notified: !!notify, starts_at: slot?.starts_at });
+}
+
+async function purgeDeleted(env) {
+  const before = new Date(Date.now() - KEEP_DELETED_DAYS * DAY).toISOString();
+  await db(env, `deleted_bookings?deleted_at=lt.${encodeURIComponent(before)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+
 async function admin(request, url, env, ctx) {
   if (!(await isAdmin(request, env))) return json({ error: 'Mot de passe incorrect.' }, 401);
   const route = `${request.method} ${url.pathname}`;
@@ -660,6 +710,8 @@ async function admin(request, url, env, ctx) {
   if (route === 'POST /api/admin/bookings') return addBooking(request, env, ctx);
   if (route === 'DELETE /api/admin/bookings') return removeBooking(url, env, ctx);
   if (route === 'GET /api/admin/report') return report(env);
+  if (route === 'GET /api/admin/deleted') return deletedLog(env);
+  if (route === 'POST /api/admin/deleted/restore') return restoreBooking(request, env, ctx);
   if (route === 'GET /api/admin/services') return listServices(env);
   if (route === 'POST /api/admin/services') return createService(request, env);
   if (route === 'DELETE /api/admin/services') return removeService(url, env);
@@ -720,5 +772,6 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReminders(env, ctx).catch((e) => console.error('rappels', e)));
+    ctx.waitUntil(purgeDeleted(env).catch((e) => console.error('corbeille', e)));
   },
 };

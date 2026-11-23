@@ -18,6 +18,7 @@ Un seul Cloudflare Worker sert le site et l'API ; la clé Supabase et le mot de 
 
 - **Sans compte** : réservations liées au navigateur (ids en `localStorage`), **sans limite** de réservations à venir (une seule place par séance). Les e-mails (confirmation, déplacement, rappel) contiennent un bouton **« Modifier ou annuler ma réservation »** qui ouvre le site sur `/?r=<id>` et rattache la réservation au navigateur qui l'ouvre.
 - **Modification/annulation** : en ligne par la cliente jusqu'à 24h avant (`POST /api/cancel`, règle vérifiée côté serveur) ; en deçà, via le studio. Une annulation faite par le studio à moins de 24h **flague** la cliente.
+- **Journal / corbeille** : toute réservation supprimée (retirée par le studio, annulée par la cliente, cours supprimé, ou même supprimée à la main dans Supabase) est copiée dans `deleted_bookings` par un trigger, avec son motif. L'onglet « Journal » de l'admin la montre 7 jours et permet de la **restaurer** à l'identique (la cliente reçoit à nouveau sa confirmation, le flag « annulation tardive » est retiré). Le cron horaire efface ce qui a plus de 7 jours.
 - **E-mails** : confirmation à la réservation (avec ajout à l'agenda via `/api/ics`), annulation, rappel la veille (cron horaire). Envoyés en HTML + texte.
 
 ## 1. Base de données (Supabase)
@@ -28,7 +29,7 @@ npx supabase link --project-ref rhwpgcnqztrtymhoqsev
 npx supabase db push
 ```
 
-Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables ; `..._pilatelia_v5.sql` : téléphone des clientes + mot de passe admin modifiable ; `..._pilatelia_v6.sql` : suppression de la limite de 3 réservations — **à appliquer avant de déployer le Worker**, sinon les réservations échouent). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
+Applique `supabase/migrations/` (dont `..._pilatelia_v2.sql` : limite 3/e-mail, flag annulation tardive, rappel ; `..._pilatelia_v3.sql` : prestations + tarif par séance ; `..._pilatelia_v4.sql` : paramètres studio modifiables ; `..._pilatelia_v5.sql` : téléphone des clientes + mot de passe admin modifiable ; `..._pilatelia_v6.sql` : suppression de la limite de 3 réservations ; `..._pilatelia_v7.sql` : corbeille des réservations supprimées (7 jours, onglet « Journal » de l'admin) + téléphone dans les annulations tardives — **à appliquer avant de déployer le Worker**, sinon les réservations échouent). Sans CLI : coller les fichiers SQL dans Supabase → SQL Editor.
 
 ## 2. Site (Cloudflare Workers)
 
