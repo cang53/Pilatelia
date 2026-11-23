@@ -15,6 +15,7 @@ $('#clearBtn').innerHTML = `${ic('trash')} Vider la semaine`;
 $('#pwdIc').innerHTML = ic('key');
 $('#presIc').innerHTML = ic('tag');
 $('#studioIc').innerHTML = ic('edit');
+$('#journalIc').innerHTML = ic('clock');
 $('#shareStory').innerHTML = `${ic('share')} Partager la story`;
 $('#saveStory').innerHTML = `${ic('download')} Enregistrer la photo`;
 $('#bgLabel').insertAdjacentHTML('afterbegin', ic('edit'));
@@ -384,6 +385,43 @@ $('#csv').addEventListener('click', () => {
   a.click(); URL.revokeObjectURL(a.href);
 });
 
+// ---------- Journal des suppressions (corbeille 7 jours) ----------
+
+async function loadJournal() {
+  const { items, keep_days: keep } = await adminApi('/api/admin/deleted');
+  const now = Date.now();
+  $('#journalList').innerHTML = items.length ? items.map((r) => {
+    const at = r.class_starts_at && new Date(r.class_starts_at);
+    const deleted = new Date(r.deleted_at);
+    const left = Math.max(1, Math.ceil((deleted.getTime() + keep * 864e5 - now) / 864e5));
+    const blocked = !r.class_exists ? 'Cours supprimé : recréez-le pour la réinscrire.'
+      : r.class_full ? 'Cours complet : libérez une place pour restaurer.' : '';
+    return `<div class="card journal-item">
+      <div class="person">
+        <span class="av">${esc(initials(r.guest_name || '?'))}</span>
+        <span class="who"><div>${esc(r.guest_name || '—')}</div>${r.guest_email ? `<a href="mailto:${esc(r.guest_email)}">${esc(r.guest_email)}</a>` : ''}${r.guest_phone
+          ? `<span class="phone-links"><a href="${esc(telLink(r.guest_phone))}">${ic('phone')} ${esc(r.guest_phone)}</a><a class="wa" href="${esc(waLink(r.guest_phone))}" target="_blank" rel="noopener">${ic('whatsapp')} WhatsApp</a></span>` : ''}</span>
+      </div>
+      <p class="journal-slot">${esc(r.class_title || 'Cours')}${at ? ` · ${fmt.day.format(at)} · ${fmt.time.format(at)}` : ''}</p>
+      <p class="muted small journal-meta"><span class="journal-reason">${esc(r.reason)}</span> le ${fmt.short.format(deleted)} à ${fmt.time.format(deleted)} · effacée dans ${plural(left, 'jour')}</p>
+      ${blocked ? `<p class="muted small">${blocked}</p>` : `<button class="btn btn-secondary btn-block" data-restore="${r.id}" data-name="${esc(r.guest_name || '')}">Restaurer la réservation</button>`}
+    </div>`;
+  }).join('') : '<p class="muted">Aucune réservation supprimée ces 7 derniers jours.</p>';
+}
+
+$('#journalList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-restore]');
+  if (!b) return;
+  if (!confirm(`Restaurer la réservation de ${b.dataset.name} ? Elle recevra un e-mail de confirmation.`)) return;
+  b.disabled = true;
+  try {
+    const res = await adminApi('/api/admin/deleted/restore', { method: 'POST', body: JSON.stringify({ id: b.dataset.restore }) });
+    toast(res.notified ? 'Réservation restaurée · e-mail envoyé' : 'Réservation restaurée');
+    if (res.starts_at) week = mondayOf(new Date(res.starts_at));
+    await loadJournal();
+  } catch (err) { b.disabled = false; toast(err.message); }
+});
+
 // ---------- Export story (canvas 1080 x 1920) ----------
 
 // Reprend la DA de l'affiche « Nos Horaires » du studio : mur sauge, vague beige,
@@ -670,7 +708,7 @@ $('#pwdForm').addEventListener('submit', async (e) => {
   } catch (err) { $('#pwdError').textContent = err.message; }
 });
 
-const loaders = { agenda: loadAgenda, prestations: loadServices, finances: loadFinance, clients: loadReport, studio: loadStudioSettings };
+const loaders = { agenda: loadAgenda, prestations: loadServices, finances: loadFinance, clients: loadReport, journal: loadJournal, studio: loadStudioSettings };
 document.querySelector('.seg').addEventListener('click', (e) => {
   const t = e.target.closest('[data-tab]');
   if (!t) return;
